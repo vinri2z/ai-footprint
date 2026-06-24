@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# setup.sh — Initialize claude-footprint: check deps, create DB, backfill history, show summary.
+# setup.sh — Initialize ai-footprint: check deps, create DB, backfill history, show summary.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_DIR="$(dirname "$SCRIPT_DIR")"
@@ -9,7 +9,7 @@ PLUGIN_DIR="$(dirname "$SCRIPT_DIR")"
 DB_DIR="${HOME}/.claude/claude-carbon"
 DB_PATH="${DB_DIR}/carbon.db"
 
-echo "🌿 claude-footprint setup"
+echo "🌿 ai-footprint setup"
 echo "─────────────────────────────"
 
 # 1. Check dependencies

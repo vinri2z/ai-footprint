@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# install.sh — One-line installer for claude-footprint.
-# Repo is private, so fetch via the authenticated GitHub CLI:
-# Usage: gh api repos/datamaraneers/claude-footprint/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
+# install.sh — One-line installer for ai-footprint.
+# Usage: gh api repos/vinri2z/ai-footprint/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
 
 # CLAUDE_FOOTPRINT_DIR is preferred; CLAUDE_CARBON_DIR stays as a fallback for older installs.
-INSTALL_DIR="${CLAUDE_FOOTPRINT_DIR:-${CLAUDE_CARBON_DIR:-$HOME/code/claude-footprint}}"
+INSTALL_DIR="${CLAUDE_FOOTPRINT_DIR:-${CLAUDE_CARBON_DIR:-$HOME/code/ai-footprint}}"
 SETTINGS_FILE="${HOME}/.claude/settings.json"
 
 echo ""
-echo "  claude-footprint installer"
+echo "  ai-footprint installer"
 echo "  Track the carbon and water footprint of your Claude Code sessions."
 echo ""
 
@@ -27,22 +26,14 @@ for cmd in jq sqlite3 git; do
   fi
 done
 
-# claude-footprint is a private repo, so cloning needs authentication.
-# Use the GitHub CLI (gh); it must be installed and authenticated (gh auth login).
+# Use the GitHub CLI (gh) to clone; it must be installed.
 if ! command -v gh &>/dev/null; then
   echo "ERROR: gh (GitHub CLI) is not installed." >&2
-  echo "  claude-footprint is a private repo and needs an authenticated clone." >&2
   if [[ "$(uname)" == "Darwin" ]]; then
-    echo "  Install with: brew install gh && gh auth login" >&2
+    echo "  Install with: brew install gh" >&2
   else
-    echo "  Install: https://github.com/cli/cli#installation — then run: gh auth login" >&2
+    echo "  Install: https://github.com/cli/cli#installation" >&2
   fi
-  exit 1
-fi
-
-if ! gh auth status &>/dev/null; then
-  echo "ERROR: gh is installed but not authenticated." >&2
-  echo "  Run: gh auth login" >&2
   exit 1
 fi
 
@@ -53,7 +44,7 @@ if [ -d "$INSTALL_DIR/.git" ]; then
 else
   echo "Cloning to $INSTALL_DIR..."
   mkdir -p "$(dirname "$INSTALL_DIR")"
-  gh repo clone datamaraneers/claude-footprint "$INSTALL_DIR" -- --quiet
+  gh repo clone vinri2z/ai-footprint "$INSTALL_DIR" -- --quiet
 fi
 
 # 3. Run setup (creates DB, backfills history)

@@ -1,7 +1,7 @@
-# claude-footprint
+# ai-footprint
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![GitHub release](https://img.shields.io/badge/release-v1.4.0-blue)](https://github.com/datamaraneers/claude-footprint/releases)
+[![GitHub release](https://img.shields.io/badge/release-v1.4.0-blue)](https://github.com/vinri2z/ai-footprint/releases)
 
 Track the carbon **and water** footprint of **all your AI coding agents** — Claude Code, Codex, Cursor, Gemini CLI, Copilot, OpenCode, and 30+ more — in one place.
 
@@ -9,10 +9,8 @@ Token usage is collected across every agent via [tokscale](https://github.com/ju
 
 **1. Install (or update):**
 
-This is a private repo, so the installer is fetched with the authenticated [GitHub CLI](https://cli.github.com). Install `gh` and run `gh auth login` first (with access to `datamaraneers/claude-footprint`), then:
-
 ```bash
-gh api repos/datamaraneers/claude-footprint/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
+gh api repos/vinri2z/ai-footprint/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
 ```
 
 Same command to install and to update to the latest version.
@@ -20,7 +18,7 @@ Same command to install and to update to the latest version.
 **2. Restart Claude Code.** Your CO2 and water appear in the status line:
 
 ```
-claude-footprint ⌥ main | 🟢 Opus 4.7 ▓▓▓░░░░░░░ 35% | 🪵 65g CO₂ · 💦 800mL · $0.50 | Use 24% ↻13:00
+ai-footprint ⌥ main | 🟢 Opus 4.7 ▓▓▓░░░░░░░ 35% | 🪵 65g CO₂ · 💦 800mL · $0.50 | Use 24% ↻13:00
 ```
 
 Segments, left to right: project + git branch, model + context window %, CO2 + water + session cost, 5h block usage % + reset time. A 🔥 prefix appears when the sustained burn rate would overshoot 100% of the limit by the end of the 5h block (after a 15 min grace window, only once usage reaches 15%).
@@ -30,7 +28,7 @@ The CO2 and water emoji cycle through a short loop on every status-line refresh 
 On a narrow terminal the segments wrap onto additional rows (no truncation, no ellipsis) — e.g. at ~60 columns:
 
 ```
-claude-footprint ⌥ main
+ai-footprint ⌥ main
 🟢 Opus 4.7 ▓▓▓░░░░░░░ 35% | 🪵 65g CO₂ · 💦 800mL · $0.50
 Use 24% ↻13:00
 ```
@@ -69,10 +67,10 @@ Generate yours with `/footprint-card` in Claude Code. Exports summary and detail
 
 ```bash
 # Since a specific date
-bash ~/code/claude-footprint/scripts/generate-report.sh --since 2026-03-01
+bash ~/code/ai-footprint/scripts/generate-report.sh --since 2026-03-01
 
 # All time
-bash ~/code/claude-footprint/scripts/generate-report.sh --all
+bash ~/code/ai-footprint/scripts/generate-report.sh --all
 ```
 
 </details>
@@ -81,7 +79,7 @@ bash ~/code/claude-footprint/scripts/generate-report.sh --all
 <summary>Custom install directory</summary>
 
 ```bash
-CLAUDE_FOOTPRINT_DIR=~/my-path/claude-footprint gh api repos/datamaraneers/claude-footprint/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
+CLAUDE_FOOTPRINT_DIR=~/my-path/ai-footprint gh api repos/vinri2z/ai-footprint/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
 ```
 
 </details>
@@ -90,8 +88,8 @@ CLAUDE_FOOTPRINT_DIR=~/my-path/claude-footprint gh api repos/datamaraneers/claud
 <summary>Manual install</summary>
 
 ```bash
-gh repo clone datamaraneers/claude-footprint ~/code/claude-footprint
-bash ~/code/claude-footprint/scripts/setup.sh
+gh repo clone vinri2z/ai-footprint ~/code/ai-footprint
+bash ~/code/ai-footprint/scripts/setup.sh
 ```
 
 Then add to `~/.claude/settings.json`:
@@ -100,7 +98,7 @@ Then add to `~/.claude/settings.json`:
 {
   "statusLine": {
     "type": "command",
-    "command": "~/code/claude-footprint/scripts/statusline.sh"
+    "command": "~/code/ai-footprint/scripts/statusline.sh"
   },
   "hooks": {
     "Stop": [
@@ -109,7 +107,7 @@ Then add to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "~/code/claude-footprint/scripts/persist-session.sh"
+            "command": "~/code/ai-footprint/scripts/persist-session.sh"
           }
         ]
       }
@@ -120,7 +118,7 @@ Then add to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "~/code/claude-footprint/scripts/safety-rescan.sh"
+            "command": "~/code/ai-footprint/scripts/safety-rescan.sh"
           }
         ]
       }
@@ -344,6 +342,6 @@ Forked from [claude-carbon](https://github.com/gwittebolle/claude-carbon) by [Ga
 
 ## Open source
 
-claude-footprint is free and open source under the [MIT license](LICENSE). Contributions welcome.
+ai-footprint is free and open source under the [MIT license](LICENSE). Contributions welcome.
 
 Built by [Vincent Rizzo](https://github.com/vinri2z).

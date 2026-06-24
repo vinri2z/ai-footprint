@@ -16,13 +16,13 @@ DB_PATH="${HOME}/.claude/claude-carbon/carbon.db"
 
 if [ ! -f "$DB_PATH" ]; then
   echo "Database not found. Run setup.sh first:"
-  echo "  bash ~/code/claude-footprint/scripts/setup.sh"
+  echo "  bash ~/code/ai-footprint/scripts/setup.sh"
   exit 1
 fi
 
 if ! sqlite3 "$DB_PATH" "SELECT 1 FROM usage LIMIT 1;" >/dev/null 2>&1; then
   echo "No multi-agent usage yet. Backfill with:"
-  echo "  bash ~/code/claude-footprint/scripts/ingest-tokscale.sh"
+  echo "  bash ~/code/ai-footprint/scripts/ingest-tokscale.sh"
   exit 1
 fi
 
@@ -74,7 +74,7 @@ TOP_MODELS="$(sqlite3 -separator '|' "$DB_PATH" \
    GROUP BY model, client ORDER BY SUM(co2_grams) DESC LIMIT 8;")"
 
 echo "==============================="
-echo "  claude-footprint report"
+echo "  ai-footprint report"
 echo "  (all agents via tokscale)"
 echo "==============================="
 echo ""

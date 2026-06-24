@@ -1,13 +1,13 @@
 {
-  "name": "claude-footprint",
+  "name": "ai-footprint",
   "version": "1.4.0",
   "description": "Track the carbon and water footprint of your Claude Code sessions",
   "author": {
     "name": "Vincent Rizzo",
     "url": "https://github.com/vinri2z"
   },
-  "homepage": "https://github.com/datamaraneers/claude-footprint",
-  "repository": "https://github.com/datamaraneers/claude-footprint",
+  "homepage": "https://github.com/vinri2z/ai-footprint",
+  "repository": "https://github.com/vinri2z/ai-footprint",
   "license": "MIT",
   "keywords": [
     "carbon-footprint",
