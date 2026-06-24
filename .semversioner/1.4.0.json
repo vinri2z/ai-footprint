@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "description": "track carbon + water footprint across all AI coding agents via tokscale (multi-agent, by-agent + by-provider breakdowns)",
+      "type": "minor"
+    }
+  ],
+  "created_at": "2026-06-23T14:45:21+00:00",
+  "version": "1.4.0"
+}

@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  methodology-vectors:
+    name: methodology golden vectors
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      # jq is preinstalled on ubuntu-latest; the runner only needs bash + jq + awk.
+      - name: Replay golden vectors against data/factors.json + data/prices.json
+        run: bash tests/run-vectors.sh
+
+  changeset-required:
+    name: semversioner changeset required
+    # Only PRs need the guard; pushes to main are released, not gated.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure a new .semversioner changeset was added
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags origin "$BASE_REF" >/dev/null 2>&1 || true
+          added=$(git diff --name-only --diff-filter=A "origin/$BASE_REF...HEAD" -- '.semversioner/next-release/*.json' | wc -l | tr -d ' ')
+          if [ "$added" -eq 0 ]; then
+            echo "::error file=.semversioner/next-release::No semversioner changeset in this PR. Run: make add-change BUMP=minor MSG=\"what changed\""
+            exit 1
+          fi
+          echo "found $added new changeset(s)"

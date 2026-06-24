@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "type": "minor",
+      "description": "Baseline release: water footprint tracking, English-only cards, statusline ordering, Makefile semver tooling. Full pre-semversioner history in CHANGELOG-archive.md."
+    }
+  ],
+  "created_at": "2026-06-21T00:00:00+00:00",
+  "version": "1.1.0"
+}

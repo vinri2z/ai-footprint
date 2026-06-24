@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "description": "semversioner-backed versioning: auto-release on push to main (test-gated) + PR changeset guard",
+      "type": "minor"
+    }
+  ],
+  "created_at": "2026-06-22T16:06:06+00:00",
+  "version": "1.2.0"
+}

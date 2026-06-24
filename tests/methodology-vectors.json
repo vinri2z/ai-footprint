@@ -1,0 +1,258 @@
+{
+  "_purpose": "Canonical golden vectors for the claude-footprint methodology (CO2, cost, and water). Source of truth shared with downstream consumers (TokenClimate SaaS keeps a byte-identical copy in tests/fixtures/ and checks it weekly). Any change to data/factors.json or data/prices.json MUST update these expected values in the same commit.",
+  "_formulas": {
+    "co2_grams": "((input_tokens + cache_creation_tokens) * factor_in + cache_read_tokens * (factor_in * cache_read_factor) + output_tokens * factor_out) / 1e6",
+    "cost_usd": "(input_tokens * price_in + cache_creation_tokens * (price_in * cache_write_multiplier) + cache_read_tokens * (price_in * cache_read_multiplier) + output_tokens * price_out) / 1e6",
+    "water_liters": "((input_tokens + cache_creation_tokens) * water_in + cache_read_tokens * (water_in * cache_read_factor) + output_tokens * water_out) / 1e6 (same shape as co2_grams; equivalently co2_grams * 3.32/287)"
+  },
+  "_token_semantics": "input_tokens here is the UNCACHED input (Anthropic usage.input_tokens). cache_creation_tokens (cache write) is separate. Note: the plugin DB column input_tokens stores input + cache_write; these vectors keep them split, as captured from the JSONL.",
+  "_constants": {
+    "cache_read_factor": 0.08,
+    "cache_write_multiplier": 1.25,
+    "cache_read_multiplier": 0.1,
+    "_family_mapping": "Models are mapped to a family by data/factors.json family_patterns (resolve_family in scripts/lib-factors.sh): claude tiers fable/opus/sonnet/haiku, plus provider-agnostic tiers frontier (Opus-equiv), mid (Sonnet-equiv), small (Haiku-equiv) and default (Sonnet-equiv fallback) for every other agent.",
+    "factors_gco2e_per_mtok": {
+      "fable": { "input": 1000, "output": 6000 },
+      "opus": { "input": 500, "output": 3000 },
+      "sonnet": { "input": 190, "output": 1140 },
+      "haiku": { "input": 95, "output": 570 },
+      "frontier": { "input": 500, "output": 3000 },
+      "mid": { "input": 190, "output": 1140 },
+      "small": { "input": 95, "output": 570 },
+      "default": { "input": 190, "output": 1140 }
+    },
+    "prices_usd_per_mtok": {
+      "fable": { "input": 10, "output": 50 },
+      "opus": { "input": 5, "output": 25 },
+      "sonnet": { "input": 3, "output": 15 },
+      "haiku": { "input": 1, "output": 5 }
+    },
+    "water_factors_l_per_mtok": {
+      "fable": { "input": 11.568, "output": 69.408 },
+      "opus": { "input": 5.784, "output": 34.704 },
+      "sonnet": { "input": 2.198, "output": 13.187 },
+      "haiku": { "input": 1.099, "output": 6.594 }
+    }
+  },
+  "_rounding": "All token counts are multiples of 10,000 so every expected value is EXACT: <= 3 decimals for co2_grams, <= 4 decimals for cost_usd, <= 5 decimals for water_liters. This makes the vectors implementation-agnostic: the bash plugin prints co2 at 4 decimals / cost + water at 6 decimals, the SaaS rounds to fewer, and both land on the exact value. Runners compare with a relative tolerance of 1e-6.",
+  "_excluded_semantics": "Vectors with excluded=true use a model matching factors.json exclude_models (default: '<synthetic>', i.e. non-billed synthetic turns with no real inference). expected_* is null: the plugin stores co2_grams=0 / water_liters=0 with excluded=1 (raw tokens kept, no estimate). Note: unlike the Claude-only era, non-Anthropic models (gpt/gemini/glm/...) are NO LONGER excluded — they map to a provider-agnostic tier and DO get an estimate (see _family_mapping). expected_cost_usd is null for non-Claude families because the footprint pipeline takes their cost from tokscale rather than computing it.",
+  "vectors": [
+    {
+      "id": "fable-mixed",
+      "description": "Fable 5, full mix of all four token kinds",
+      "model": "claude-fable-5",
+      "input_tokens": 50000,
+      "cache_creation_tokens": 200000,
+      "cache_read_tokens": 3000000,
+      "output_tokens": 30000,
+      "expected_co2_grams": 670.0,
+      "expected_cost_usd": 7.5,
+      "expected_water_liters": 7.75056
+    },
+    {
+      "id": "opus-no-cache",
+      "description": "Opus, plain input/output, no cache traffic",
+      "model": "claude-opus-4-6",
+      "input_tokens": 1000000,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 0,
+      "output_tokens": 100000,
+      "expected_co2_grams": 800.0,
+      "expected_cost_usd": 7.5,
+      "expected_water_liters": 9.2544
+    },
+    {
+      "id": "sonnet-cache-read-dominant",
+      "description": "Sonnet, cache_read dominant - shape of a real Claude Code session (dated model id resolved by family pattern)",
+      "model": "claude-sonnet-4-5-20250929",
+      "input_tokens": 20000,
+      "cache_creation_tokens": 150000,
+      "cache_read_tokens": 12000000,
+      "output_tokens": 80000,
+      "expected_co2_grams": 305.9,
+      "expected_cost_usd": 5.4225,
+      "expected_water_liters": 3.5387
+    },
+    {
+      "id": "haiku-mixed",
+      "description": "Haiku, full mix of all four token kinds",
+      "model": "claude-3-5-haiku",
+      "input_tokens": 40000,
+      "cache_creation_tokens": 10000,
+      "cache_read_tokens": 500000,
+      "output_tokens": 20000,
+      "expected_co2_grams": 19.95,
+      "expected_cost_usd": 0.2025,
+      "expected_water_liters": 0.23079
+    },
+    {
+      "id": "opus-cache-write-only",
+      "description": "Opus, cache_write only: full input factor for CO2, 1.25x input price",
+      "model": "claude-opus-4-6",
+      "input_tokens": 0,
+      "cache_creation_tokens": 100000,
+      "cache_read_tokens": 0,
+      "output_tokens": 0,
+      "expected_co2_grams": 50.0,
+      "expected_cost_usd": 0.625,
+      "expected_water_liters": 0.5784
+    },
+    {
+      "id": "sonnet-cache-read-only",
+      "description": "Sonnet, cache_read only: 0.08x input factor for CO2, 0.1x input price",
+      "model": "claude-sonnet-4",
+      "input_tokens": 0,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 1000000,
+      "output_tokens": 0,
+      "expected_co2_grams": 15.2,
+      "expected_cost_usd": 0.3,
+      "expected_water_liters": 0.17584
+    },
+    {
+      "id": "all-zeros",
+      "description": "Known model, zero tokens everywhere",
+      "model": "claude-sonnet-4",
+      "input_tokens": 0,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 0,
+      "output_tokens": 0,
+      "expected_co2_grams": 0.0,
+      "expected_cost_usd": 0.0,
+      "expected_water_liters": 0.0
+    },
+    {
+      "id": "excluded-synthetic",
+      "description": "Synthetic/non-billed turns (<synthetic>): no real inference, no estimate fabricated",
+      "model": "<synthetic>",
+      "input_tokens": 100000,
+      "cache_creation_tokens": 50000,
+      "cache_read_tokens": 2000000,
+      "output_tokens": 40000,
+      "excluded": true,
+      "expected_co2_grams": null,
+      "expected_cost_usd": null,
+      "expected_water_liters": null
+    },
+    {
+      "id": "fable-mythos-alias",
+      "description": "Fable family via the mythos model id",
+      "model": "claude-mythos-5",
+      "input_tokens": 10000,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 0,
+      "output_tokens": 10000,
+      "expected_co2_grams": 70.0,
+      "expected_cost_usd": 0.6,
+      "expected_water_liters": 0.80976
+    },
+    {
+      "id": "opus-heavy-session",
+      "description": "Opus, large session with heavy cache traffic",
+      "model": "claude-opus-4-7",
+      "input_tokens": 30000,
+      "cache_creation_tokens": 400000,
+      "cache_read_tokens": 8000000,
+      "output_tokens": 60000,
+      "expected_co2_grams": 715.0,
+      "expected_cost_usd": 8.15,
+      "expected_water_liters": 8.27112
+    },
+    {
+      "id": "haiku-tiny-session",
+      "description": "Haiku, small symmetric session, no cache",
+      "model": "claude-haiku",
+      "input_tokens": 10000,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 0,
+      "output_tokens": 10000,
+      "expected_co2_grams": 6.65,
+      "expected_cost_usd": 0.06,
+      "expected_water_liters": 0.07693
+    },
+    {
+      "id": "haiku-cache-read-only",
+      "description": "Haiku, large cache_read only",
+      "model": "claude-3-5-haiku",
+      "input_tokens": 0,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 10000000,
+      "output_tokens": 0,
+      "expected_co2_grams": 76.0,
+      "expected_cost_usd": 1.0,
+      "expected_water_liters": 0.8792
+    },
+    {
+      "id": "frontier-gpt5",
+      "description": "Non-Anthropic frontier model (gpt-5) -> frontier tier (Opus-equivalent factors). Cost from tokscale, not computed here.",
+      "model": "gpt-5",
+      "input_tokens": 1000000,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 0,
+      "output_tokens": 100000,
+      "expected_co2_grams": 800.0,
+      "expected_cost_usd": null,
+      "expected_water_liters": 9.2544
+    },
+    {
+      "id": "frontier-gpt5-codex-cache",
+      "description": "gpt-5-codex with heavy cache_read -> frontier tier; cache_read at 0.08x input factor",
+      "model": "gpt-5-codex",
+      "input_tokens": 20000,
+      "cache_creation_tokens": 150000,
+      "cache_read_tokens": 12000000,
+      "output_tokens": 80000,
+      "expected_co2_grams": 805.0,
+      "expected_cost_usd": null,
+      "expected_water_liters": 9.31224
+    },
+    {
+      "id": "mid-gpt4o",
+      "description": "gpt-4o -> mid tier (Sonnet-equivalent factors)",
+      "model": "gpt-4o",
+      "input_tokens": 1000000,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 0,
+      "output_tokens": 100000,
+      "expected_co2_grams": 304.0,
+      "expected_cost_usd": null,
+      "expected_water_liters": 3.5167
+    },
+    {
+      "id": "small-gpt4o-mini",
+      "description": "gpt-4o-mini -> small tier (Haiku-equivalent factors); 'mini' matched before frontier patterns",
+      "model": "gpt-4o-mini",
+      "input_tokens": 1000000,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 0,
+      "output_tokens": 100000,
+      "expected_co2_grams": 152.0,
+      "expected_cost_usd": null,
+      "expected_water_liters": 1.7584
+    },
+    {
+      "id": "small-gpt5-mini-order",
+      "description": "gpt-5-mini must resolve to small (not frontier): the 'mini' pattern precedes the gpt-5 pattern",
+      "model": "gpt-5-mini",
+      "input_tokens": 1000000,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 0,
+      "output_tokens": 100000,
+      "expected_co2_grams": 152.0,
+      "expected_cost_usd": null,
+      "expected_water_liters": 1.7584
+    },
+    {
+      "id": "default-unknown-model",
+      "description": "Unknown real model not matched by any specific pattern -> default tier (Sonnet-equivalent fallback)",
+      "model": "some-internal-llm-9000",
+      "input_tokens": 1000000,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 0,
+      "output_tokens": 100000,
+      "expected_co2_grams": 304.0,
+      "expected_cost_usd": null,
+      "expected_water_liters": 3.5167
+    }
+  ]
+}

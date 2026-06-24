@@ -1,0 +1,74 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+# Never let two releases race on main.
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: auto-release on main
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Skip the commit the release job itself pushes back, to avoid a loop.
+    # (Belt-and-suspenders: GITHUB_TOKEN pushes also don't retrigger workflows.)
+    if: ${{ !startsWith(github.event.head_commit.message, 'release:') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Gate: a red main must not ship. Same suite as ci.yml.
+      - name: Golden vectors must pass before release
+        run: bash tests/run-vectors.sh
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install semversioner
+        run: pip install semversioner
+
+      - name: Decide whether there is anything to release
+        id: decide
+        run: |
+          if [ -z "$(ls -A .semversioner/next-release 2>/dev/null)" ]; then
+            echo "No pending changesets — nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure git identity
+        if: steps.decide.outputs.release == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Release (bump, sync version, regen CHANGELOG, commit + tag)
+        if: steps.decide.outputs.release == 'true'
+        run: make release
+
+      - name: Push commit and tag
+        if: steps.decide.outputs.release == 'true'
+        run: |
+          git push origin HEAD:main
+          git push origin --tags
+
+      - name: Create GitHub Release
+        if: steps.decide.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ver="$(jq -r .version .claude-plugin/plugin.json)"
+          # Release notes = this version's section, minus the generated file header.
+          notes="$(semversioner changelog --template .semversioner/config/template.j2 --version "$ver" | tail -n +4)"
+          gh release create "v$ver" --title "v$ver" --notes "$notes"

@@ -1,0 +1,58 @@
+{
+  "_methodology": "Jegham et al. 2025 - AWS PUE 1.14, CIF 0.287 kgCO2e/kWh. Output factor = 6x input across every family (the paper's decode/prefill energy ratio); water factor = co2 factor x 3.32/287 (~0.0115679 L/gCO2e).",
+  "_units": "gCO2e per million tokens",
+  "_source": "https://arxiv.org/abs/2505.09598",
+  "_cache_read_factor": "Energy of a cache_read token as a fraction of an uncached input token. Engineering estimate (~0.08, defensible range 0.05-0.15) derived from the decode-phase KV re-read residual. NOT the provider 0.1x billing ratio (a price, not energy). See METHODOLOGY.md.",
+  "cache_read_factor": 0.08,
+
+  "_models": "CO2 emission factors per model FAMILY. Claude families (fable/opus/sonnet/haiku) are the original measured/extrapolated set. The provider-agnostic tiers (frontier/mid/small/default) cover every other agent tokscale tracks (OpenAI, Google, xAI, DeepSeek, GLM, Kimi, Qwen, Llama, ...). A model string is mapped to a family by family_patterns below.",
+  "models": {
+    "fable": { "input": 1000, "output": 6000 },
+    "opus": { "input": 500, "output": 3000 },
+    "sonnet": { "input": 190, "output": 1140 },
+    "haiku": { "input": 95, "output": 570 },
+    "frontier": { "input": 500, "output": 3000 },
+    "mid": { "input": 190, "output": 1140 },
+    "small": { "input": 95, "output": 570 },
+    "default": { "input": 190, "output": 1140 }
+  },
+
+  "_water": "Water = inference energy x water intensity. WIF = onsite WUE 0.18 + offsite EWIF 3.14 = 3.32 L/kWh; CIF 287 gCO2e/kWh. Per-model water factor = co2_factor x 3.32/287 (~0.0115679 L/gCO2e). Conservative/over-estimate: uses US-grid average electricity-water (EWIF), not the more efficient hyperscaler-region mix. Sources: AWS 2024 sustainability WUE; Li et al. 2023 (arXiv:2304.03271); Reig et al./WRI EWIF 3.14; EESI. See METHODOLOGY.md.",
+  "_water_units": "liters per million tokens",
+  "water_factors": {
+    "fable": { "input": 11.568, "output": 69.408 },
+    "opus": { "input": 5.784, "output": 34.704 },
+    "sonnet": { "input": 2.198, "output": 13.187 },
+    "haiku": { "input": 1.099, "output": 6.594 },
+    "frontier": { "input": 5.784, "output": 34.704 },
+    "mid": { "input": 2.198, "output": 13.187 },
+    "small": { "input": 1.099, "output": 6.594 },
+    "default": { "input": 2.198, "output": 13.187 }
+  },
+
+  "_provenance": {
+    "sonnet": "measured (Jegham et al. 2025)",
+    "opus": "extrapolated: 3x Sonnet (parameter-count / list-price ratio)",
+    "fable": "extrapolated: 2x Opus (list-price ratio $10/$50 vs $5/$25)",
+    "haiku": "extrapolated: 0.5x Sonnet",
+    "frontier": "extrapolated: Opus-tier proxy for frontier non-Anthropic models (gpt-5, o-series, *-pro, grok-4, deepseek-r). Estimate.",
+    "mid": "extrapolated: Sonnet-tier proxy for mid non-Anthropic models (gpt-4 class, gemini, glm, kimi, qwen, llama, mistral). Estimate.",
+    "small": "extrapolated: Haiku-tier proxy for small/fast models (*-mini, *-nano, *-flash, *-lite, 7b/8b). Estimate.",
+    "default": "extrapolated: Sonnet-tier fallback for any real model not matched by a more specific pattern. Low-confidence estimate."
+  },
+
+  "_family_patterns": "Ordered list mapping a model string to a family. First case-insensitive regex match wins; if none match, the family is 'default'. Specific (small/frontier) patterns are listed before generic ones so e.g. 'gpt-5-mini' resolves to small, not frontier.",
+  "family_patterns": [
+    { "pattern": "fable|mythos", "family": "fable" },
+    { "pattern": "opus", "family": "opus" },
+    { "pattern": "haiku", "family": "haiku" },
+    { "pattern": "sonnet", "family": "sonnet" },
+    { "pattern": "mini|nano|flash|-lite|lite$|small|phi-|[0-9]b\\b|gemma", "family": "small" },
+    { "pattern": "gpt-?5|o1|o3|o4|gemini-[0-9.]*-?pro|grok-4|deepseek-r|sonar-reasoning", "family": "frontier" },
+    { "pattern": "gpt|gemini|grok|deepseek|glm|kimi|qwen|llama|mistral|moonshot|minimax|codex|command|sonar", "family": "mid" },
+    { "pattern": "claude", "family": "mid" }
+  ],
+
+  "_exclude_models": "Models stored with co2_grams=0, water_liters=0 and excluded=1, and left out of footprint aggregates. '<synthetic>' is Claude Code's marker for non-billed synthetic turns (no real inference). Add case-insensitive regex patterns to exclude local/test models by name.",
+  "exclude_models": ["<synthetic>"]
+}

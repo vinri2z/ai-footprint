@@ -1,0 +1,33 @@
+{
+  "name": "claude-footprint",
+  "owner": {
+    "name": "Vincent Rizzo"
+  },
+  "metadata": {
+    "description": "Track the carbon and water footprint of your Claude Code sessions"
+  },
+  "plugins": [
+    {
+      "name": "claude-footprint",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/datamaraneers/claude-footprint.git"
+      },
+      "description": "Track the carbon and water footprint of your Claude Code sessions",
+      "version": "1.4.0",
+      "author": {
+        "name": "Vincent Rizzo"
+      },
+      "homepage": "https://github.com/datamaraneers/claude-footprint",
+      "repository": "https://github.com/datamaraneers/claude-footprint",
+      "license": "MIT",
+      "keywords": [
+        "carbon-footprint",
+        "water-footprint",
+        "sustainability",
+        "claude-code",
+        "green-it"
+      ]
+    }
+  ]
+}

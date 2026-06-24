@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "description": "switch statusline emoji animation to wall-clock seconds (1 s cadence)",
+      "type": "patch"
+    }
+  ],
+  "created_at": "2026-06-23T13:23:07+00:00",
+  "version": "1.3.2"
+}

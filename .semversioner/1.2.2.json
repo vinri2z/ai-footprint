@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "description": "replace failing GitHub API badges with static alternatives; stars badge removed, release badge auto-updated on make release",
+      "type": "patch"
+    }
+  ],
+  "created_at": "2026-06-22T19:11:56+00:00",
+  "version": "1.2.2"
+}

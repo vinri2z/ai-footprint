@@ -1,0 +1,6 @@
+*.db
+*.db-journal
+exports/
+docs/private/
+.DS_Store
+.playwright-mcp/
