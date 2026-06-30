@@ -1,7 +1,7 @@
 # ai-footprint
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![GitHub release](https://img.shields.io/badge/release-v2.4.0-blue)](https://github.com/vinri2z/ai-footprint/releases)
+[![GitHub release](https://img.shields.io/badge/release-v2.4.1-blue)](https://github.com/vinri2z/ai-footprint/releases)
 
 Track the carbon **and water** footprint of **all your AI coding agents** — Claude Code, Codex, Cursor, Gemini CLI, Copilot, OpenCode, and 30+ more — in one place.
 
