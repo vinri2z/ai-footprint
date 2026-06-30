@@ -1,0 +1,4 @@
+{
+  "type": "minor",
+  "description": "add today-by-hour-by-model breakdown chart; show CO2 equivalences for Paris-NY flights and energy-based (kWh) electric-car/TGV distance estimates"
+}

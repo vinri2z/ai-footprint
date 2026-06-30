@@ -30,8 +30,10 @@ set -euo pipefail
 #
 # Output JSON (all CO2 in grams, water in liters, cost in USD):
 #   { today, year, all, first_date, last_date,
-#     by_agent[], by_project[], by_provider[], by_model[], by_month[], by_day[] }
+#     by_agent[], by_project[], by_provider[], by_model[], by_month[], by_day[], by_hour[] }
 # where each total object is { co2, water, cost, tokens, agents, models }.
+# by_hour[] (today only) is { hour, model, co2, water, cost, tokens } — see PYEOF below
+# for how a per-hour-per-model split is estimated from tokscale's `hourly` report.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib-factors.sh
@@ -151,7 +153,8 @@ DAY_START="$(python3 -c "import datetime,sys;w=int(sys.argv[1]);u=datetime.date.
 DAYS="$(python3 -c "import datetime,sys;a=datetime.date.fromisoformat(sys.argv[1]);b=datetime.date.fromisoformat(sys.argv[2]);print('\n'.join((a+datetime.timedelta(d)).isoformat() for d in range((b-a).days+1)))" "$DAY_START" "$UNTIL")"
 
 ROWS_FILE="$(mktemp "${TMPDIR:-/tmp}/ai-footprint-rows-XXXXXX")"
-trap 'rm -f "$ROWS_FILE"' EXIT
+HOURLY_FILE="$(mktemp "${TMPDIR:-/tmp}/ai-footprint-hourly-XXXXXX")"
+trap 'rm -f "$ROWS_FILE" "$HOURLY_FILE"' EXIT
 
 # Invalidate the cache if the tokscale config / agent set changed; ensure the schema exists.
 cache_init || true
@@ -176,8 +179,16 @@ fetch_bucket() {
 for M in $MONTHS; do fetch_bucket month "$M" >> "$ROWS_FILE"; done
 for D in $DAYS;   do fetch_bucket day   "$D" >> "$ROWS_FILE"; done
 
+# tokscale's `hourly` report has no model/workspace grouping, so it can't be cached
+# per-bucket like month/day — it's only ever queried live, only for the real "today"
+# (not a historical --until), and only to derive an hour-of-day *shape* for today's
+# already-computed per-model totals (see PYEOF below).
+if [ "$UNTIL" = "$TODAY" ]; then
+  run_tokscale hourly --json --today > "$HOURLY_FILE" || true
+fi
+
 # --- Aggregate the rows into the report JSON --------------------------------
-HOME="$HOME" TODAY="$TODAY" python3 - "$ROWS_FILE" <<'PYEOF'
+HOME="$HOME" TODAY="$TODAY" python3 - "$ROWS_FILE" "$HOURLY_FILE" <<'PYEOF'
 import json, os, sys
 from collections import defaultdict
 
@@ -252,6 +263,59 @@ months_present = sorted({r["bucket"] for r in monthly})
 first_date = (months_present[0] + "-01") if months_present else ""
 last_date  = today if monthly or daily else ""
 
+# by_hour: today's per-model totals (already computed above, exact) spread across the
+# hours they were used in. tokscale's `hourly` report gives per-hour totals plus *which*
+# models were active that hour, but not a per-model split within the hour — so a single-
+# model hour is attributed exactly, and a mixed hour is split between its active models
+# in proportion to each model's overall share of today (the best estimate available).
+model_totals_today = {}
+for r in daily:
+    if r["bucket"] != today:
+        continue
+    mt = model_totals_today.setdefault(r["model"], {"tokens": 0, "co2": 0.0, "water": 0.0, "cost": 0.0})
+    mt["tokens"] += tok(r)
+    mt["co2"] += r["co2"]
+    mt["water"] += r["water"]
+    mt["cost"] += r["cost"]
+
+hourly_entries = []
+try:
+    with open(sys.argv[2]) as hf:
+        content = hf.read().strip()
+    if content:
+        hourly_entries = json.loads(content).get("entries", [])
+except Exception:
+    hourly_entries = []
+
+hour_weight = defaultdict(lambda: defaultdict(float))  # hour_weight[model][hour] = est. tokens
+for e in hourly_entries:
+    hour = e.get("hour")
+    active = [m for m in e.get("models", []) if m in model_totals_today]
+    if not hour or not active:
+        continue
+    hour_tokens = e.get("input", 0) + e.get("output", 0) + e.get("cacheRead", 0) + e.get("cacheWrite", 0)
+    if len(active) == 1:
+        hour_weight[active[0]][hour] += hour_tokens or 1
+    else:
+        share_total = sum(model_totals_today[m]["tokens"] for m in active) or 1
+        for m in active:
+            hour_weight[m][hour] += hour_tokens * (model_totals_today[m]["tokens"] / share_total)
+
+by_hour = []
+for model, hours in hour_weight.items():
+    total_w = sum(hours.values()) or 1
+    mt = model_totals_today[model]
+    for hour, w in hours.items():
+        frac = w / total_w
+        by_hour.append({
+            "hour": hour, "model": model,
+            "co2": round(mt["co2"] * frac, 4),
+            "water": round(mt["water"] * frac, 5),
+            "cost": round(mt["cost"] * frac, 4),
+            "tokens": round(mt["tokens"] * frac),
+        })
+by_hour.sort(key=lambda x: (x["hour"], x["model"]))
+
 data = {
     "today": totals([r for r in daily if r["bucket"] == today]),
     "year":  totals([r for r in monthly if r["bucket"].startswith(year)]),
@@ -308,6 +372,7 @@ data = {
               lambda row, grp: row.update(agent_count=len({r["client"] for r in grp}))),
         key=lambda x: x["date"], reverse=True,
     ),
+    "by_hour": by_hour,
 }
 
 json.dump(data, sys.stdout, ensure_ascii=False)

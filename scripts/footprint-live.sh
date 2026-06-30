@@ -119,9 +119,14 @@ read -r TOTAL_CO2 TOTAL_WATER TOTAL_COST AGENT_COUNT < <(
 )
 
 # --- CO2 equivalences ---
+# ENERGY_KWH backs out inference energy from CO2 via CIF (0.287 kgCO2e/kWh = 287 gCO2e/kWh,
+# see METHODOLOGY.md Infrastructure parameters) — kWh, EV km and TGV km are all derived from it.
 KM_CAR="$(echo "$TOTAL_CO2" | awk '{printf "%.0f", $1 / 120}')"
 GOOGLE="$(echo  "$TOTAL_CO2" | awk '{printf "%.0f", $1 / 0.2}')"
-KM_TGV="$(echo  "$TOTAL_CO2" | awk '{printf "%.0f", $1 / 2.4}')"
+FLIGHTS="$(echo "$TOTAL_CO2" | awk '{printf "%.4f", $1 / 400000}')"
+ENERGY_KWH="$(echo "$TOTAL_CO2" | awk '{printf "%.3f", $1 / 287}')"
+KM_EV="$(echo "$ENERGY_KWH" | awk '{printf "%.0f", $1 / 0.18}')"
+KM_TGV="$(echo "$ENERGY_KWH" | awk '{printf "%.0f", $1 / 0.056}')"
 
 # --- Water equivalences ---
 BOTTLES="$(echo "$TOTAL_WATER" | awk '{printf "%.0f", $1 / 0.5}')"
@@ -163,7 +168,11 @@ echo ""
 echo "--- CO2 equivalences ---"
 echo "  ${KM_CAR} km by car            (120 gCO2e/km)"
 echo "  ${GOOGLE} Google searches       (0.2 gCO2e)"
-echo "  ${KM_TGV} km by train           (2.4 gCO2e/km)"
+echo "  ${FLIGHTS} Paris↔New-York flights (400 kg CO2e/pax one-way)"
+echo ""
+echo "--- Energy equivalences (${ENERGY_KWH} kWh estimated) ---"
+echo "  ${KM_EV} km by electric car     (0.18 kWh/km)"
+echo "  ${KM_TGV} km by TGV             (0.056 kWh/passenger-km)"
 echo ""
 echo "--- Water equivalences ---"
 echo "  ${BOTTLES} water bottles          (0.5 L)"
