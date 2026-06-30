@@ -38,6 +38,17 @@ echo "  jq: OK"
 echo "  python3: OK"
 echo "  npx: OK"
 
+# Confirm tokscale itself resolves and runs (npx fetches it on first use). Soft check:
+# the real test is the summary below, so a miss here warns but does not abort setup.
+TOKSCALE="${AI_FOOTPRINT_TOKSCALE:-npx --yes tokscale@latest}"
+printf '  tokscale: '
+if TS_VER="$($TOKSCALE --version 2>/dev/null | head -n1)" && [ -n "$TS_VER" ]; then
+  echo "OK (${TS_VER})"
+else
+  echo "could not run yet — will retry on first report"
+  echo "    Fetched on demand via 'npx tokscale@latest'; needs Node + network access."
+fi
+
 # 2. Create cache directory (used by the status line for the 5h OAuth usage cache)
 mkdir -p "$CACHE_DIR"
 
@@ -76,6 +87,30 @@ else
   echo "  No usage found yet (or tokscale could not run). Reports will populate once you"
   echo "  have agent activity on disk."
 fi
+
+# 3b. Agent coverage hints. tokscale auto-discovers most agents from their local session
+# stores; a few need a one-time login/sync (or env var) before they show up. Nudge for any
+# login-required agent not already present in the data.
+DETECTED="$({ printf '%s' "$DATA_JSON" | jq -r '.by_agent[].client'; } 2>/dev/null \
+  | tr '[:upper:]' '[:lower:]' | tr '\n' ' ' || true)"
+
+HINT_SHOWN=0
+while IFS='|' read -r kw label cmd; do
+  [ -n "$kw" ] || continue
+  case " $DETECTED " in *"$kw"*) continue ;; esac
+  if [ "$HINT_SHOWN" -eq 0 ]; then
+    echo ""
+    echo "Not seeing an agent? A few need a one-time setup before tokscale can read them:"
+    HINT_SHOWN=1
+  fi
+  printf '  • %-13s %s\n' "$label" "$cmd"
+done <<'HINTS'
+cursor|Cursor:|npx tokscale@latest cursor login
+copilot|Copilot:|set COPILOT_OTEL_ENABLED=true before launching the Copilot CLI
+antigravity|Antigravity:|npx tokscale@latest antigravity sync   (with the editor open)
+trae|Trae:|npx tokscale@latest trae login && npx tokscale@latest trae sync
+warp|Warp:|npx tokscale@latest warp login && npx tokscale@latest warp sync
+HINTS
 
 # 4. Next steps (skip if called from install.sh which handles config automatically)
 if [ "${AI_FOOTPRINT_INSTALLER:-}" != "1" ]; then

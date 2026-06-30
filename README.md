@@ -122,6 +122,22 @@ No background hooks are needed — reports read from tokscale on demand. Restart
 
 **statusline** reads `context_window.total_input_tokens` from Claude Code at each turn for an indicative live CO2/water/cost readout of the current Claude Code session. It is display-only (so it can't double-count what tokscale already captures).
 
+### Agent coverage & tokscale setup
+
+ai-footprint never installs or configures tokscale itself — it runs `npx tokscale@latest`, which fetches and caches the binary on first use. tokscale then discovers each agent by reading its **local** session store, so for the common agents there is **nothing to install, no API key, and no config**: Claude Code, Codex, Gemini CLI, OpenCode and ~30 others are picked up automatically as soon as they've written sessions to disk, and show up in the next report.
+
+A few agents keep their usage behind an API or a telemetry flag instead of a local file, so they need a **one-time** step before tokscale can read them:
+
+| Agent | One-time setup |
+| ----- | -------------- |
+| **Cursor** | `npx tokscale@latest cursor login` — caches Cursor's API usage locally |
+| **GitHub Copilot** | Launch the Copilot CLI with `COPILOT_OTEL_ENABLED=true` so it writes telemetry to `~/.copilot/otel/` |
+| **Antigravity** | `npx tokscale@latest antigravity sync` (with the editor open) |
+| **Trae** | `npx tokscale@latest trae login`, then `npx tokscale@latest trae sync` |
+| **Warp** | `npx tokscale@latest warp login`, then `npx tokscale@latest warp sync` |
+
+These commands store their state under `~/.config/tokscale/`, so it persists across the on-demand `npx` runs ai-footprint uses — run them once (re-run the `sync` ones to refresh). `bash scripts/setup.sh` prints the same reminders for any login-required agent it doesn't yet see in your usage.
+
 ### Live data, no store
 
 There is no database. Every report reads tokscale directly and recomputes CO2/water from `data/factors.json` on the spot, so changing a factor or the family mapping takes effect on the next report with nothing to migrate or recompute — just edit `data/factors.json`.
@@ -203,7 +219,7 @@ The methodology is pinned by golden test vectors in [`tests/methodology-vectors.
 - `curl` - 5h quota usage via Anthropic's `/api/oauth/usage` endpoint (optional, 60s cache)
 - `playwright-core` + Chromium - PNG export for `/footprint-card` (optional)
 
-`jq` and `python3` are pre-installed on macOS. On Linux: `apt install jq python3`. Install Node (for tokscale) from [nodejs.org](https://nodejs.org) or `brew install node`. tokscale itself needs no separate install — it is fetched on demand by `npx`.
+`jq` and `python3` are pre-installed on macOS. On Linux: `apt install jq python3`. Install Node (for tokscale) from [nodejs.org](https://nodejs.org) or `brew install node`. tokscale itself needs no separate install — it is fetched on demand by `npx`. Most agents are tracked automatically; Cursor, Copilot and a few others need a one-time login/sync — see [Agent coverage & tokscale setup](#agent-coverage--tokscale-setup).
 
 To use `/footprint-card`, install Playwright and its Chromium browser:
 
