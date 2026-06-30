@@ -1,0 +1,4 @@
+{
+  "type": "minor",
+  "description": "replace monthly CO2 bar chart with interactive timeseries chart (series + range selector); fix water unit display to use m\u00b3 for values above 1000 L"
+}
