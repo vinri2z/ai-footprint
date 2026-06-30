@@ -415,14 +415,35 @@ HTML = """\
 
   <!-- ── Tabs ─────────────────────────────────────────────────────────── -->
   <div class="tab-nav">
-    <button class="tab-btn active" data-tab="agents">By Agent</button>
+    <button class="tab-btn active" data-tab="projects">By Project</button>
+    <button class="tab-btn" data-tab="agents">By Agent</button>
     <button class="tab-btn" data-tab="providers">By Provider</button>
     <button class="tab-btn" data-tab="models">By Model</button>
+    <button class="tab-btn" data-tab="months">By Month</button>
     <button class="tab-btn" data-tab="daily">Daily Timeline</button>
   </div>
 
+  <!-- By Project -->
+  <div class="tab-pane active" id="pane-projects">
+    <div class="tbl-wrap">
+      <table id="tbl-projects">
+        <thead><tr>
+          <th data-col="project">Project</th>
+          <th data-col="co2" class="r s-desc">CO₂</th>
+          <th data-col="water" class="r">Water</th>
+          <th data-col="cost" class="r">Cost</th>
+          <th data-col="tokens" class="r">Tokens</th>
+          <th data-col="top_agent">Top agent</th>
+          <th data-col="agent_count" class="r">Agents</th>
+          <th data-col="model_count" class="r">Models</th>
+        </tr></thead>
+        <tbody id="body-projects"></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- By Agent -->
-  <div class="tab-pane active" id="pane-agents">
+  <div class="tab-pane" id="pane-agents">
     <div class="tbl-wrap">
       <table id="tbl-agents">
         <thead><tr>
@@ -431,6 +452,7 @@ HTML = """\
           <th data-col="water" class="r">Water</th>
           <th data-col="cost" class="r">Cost</th>
           <th data-col="tokens" class="r">Tokens</th>
+          <th data-col="project_count" class="r">Projects</th>
           <th data-col="model_count" class="r">Models</th>
           <th data-col="first_date">First seen</th>
         </tr></thead>
@@ -471,6 +493,25 @@ HTML = """\
           <th data-col="agent_count" class="r">Agents</th>
         </tr></thead>
         <tbody id="body-models"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- By Month -->
+  <div class="tab-pane" id="pane-months">
+    <div class="tbl-wrap">
+      <table id="tbl-months">
+        <thead><tr>
+          <th data-col="month" class="s-desc">Month</th>
+          <th data-col="co2" class="r">CO₂</th>
+          <th data-col="water" class="r">Water</th>
+          <th data-col="cost" class="r">Cost</th>
+          <th data-col="tokens" class="r">Tokens</th>
+          <th data-col="project_count" class="r">Projects</th>
+          <th data-col="agent_count" class="r">Agents</th>
+          <th data-col="model_count" class="r">Models</th>
+        </tr></thead>
+        <tbody id="body-months"></tbody>
       </table>
     </div>
   </div>
@@ -668,14 +709,31 @@ refreshHero();
 refreshEquiv();
 buildChart();
 
-makeTable('tbl-agents', 'body-agents', D.by_agent || [], [
-  { key:'client',      render:(v) => '<span class="name-cell">' + (v||'–') + '</span>' },
+function monthLabel(m) {
+  const d = new Date(m + '-02'); // +2 avoids UTC-offset day-1 issues
+  return d.toLocaleString('en', { month:'short' }) + " '" + String(d.getFullYear()).slice(2);
+}
+
+makeTable('tbl-projects', 'body-projects', D.by_project || [], [
+  { key:'project',     render:(v) => '<span class="name-cell">' + (v||'–') + '</span>' },
   { key:'co2' },
   { key:'water',       r:true, render:(v) => waterStr(v) },
   { key:'cost',        r:true, render:(v) => costStr(v) },
   { key:'tokens',      r:true, render:(v) => tokStr(v) },
+  { key:'top_agent',   dim:true },
+  { key:'agent_count', r:true, dim:true },
   { key:'model_count', r:true, dim:true },
-  { key:'first_date',  dim:true },
+]);
+
+makeTable('tbl-agents', 'body-agents', D.by_agent || [], [
+  { key:'client',        render:(v) => '<span class="name-cell">' + (v||'–') + '</span>' },
+  { key:'co2' },
+  { key:'water',         r:true, render:(v) => waterStr(v) },
+  { key:'cost',          r:true, render:(v) => costStr(v) },
+  { key:'tokens',        r:true, render:(v) => tokStr(v) },
+  { key:'project_count', r:true, dim:true },
+  { key:'model_count',   r:true, dim:true },
+  { key:'first_date',    dim:true },
 ]);
 
 makeTable('tbl-providers', 'body-providers', D.by_provider || [], [
@@ -698,6 +756,17 @@ makeTable('tbl-models', 'body-models', D.by_model || [], [
   { key:'cost',        r:true, render:(v) => costStr(v) },
   { key:'tokens',      r:true, render:(v) => tokStr(v) },
   { key:'agent_count', r:true, dim:true },
+]);
+
+makeTable('tbl-months', 'body-months', D.by_month || [], [
+  { key:'month',         defaultSort:true, render:(v) => '<span class="name-cell">' + monthLabel(v) + '</span>' },
+  { key:'co2' },
+  { key:'water',         r:true, render:(v) => waterStr(v) },
+  { key:'cost',          r:true, render:(v) => costStr(v) },
+  { key:'tokens',        r:true, render:(v) => tokStr(v) },
+  { key:'project_count', r:true, dim:true },
+  { key:'agent_count',   r:true, dim:true },
+  { key:'model_count',   r:true, dim:true },
 ]);
 
 makeTable('tbl-daily', 'body-daily', D.by_day || [], [

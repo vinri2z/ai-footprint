@@ -1,6 +1,6 @@
 ---
 name: footprint-report
-description: Launch an interactive web dashboard showing CO2 and water footprint across all AI coding agents — explorable by agent, provider, model, and daily timeline. Opens a browser at http://localhost:7331.
+description: Launch an interactive web dashboard showing CO2, water, cost and token footprint across all AI coding agents — explorable by project, agent, provider, model, month, and daily timeline. Opens a browser at http://localhost:7331.
 ---
 
 Run the following bash script exactly as written and present the output to the user. Do not paraphrase or reformat the results.
@@ -42,9 +42,11 @@ echo "  Open: http://localhost:${PORT}"
 echo "  (the first load reads live from tokscale and may take ~20-60s)"
 echo ""
 echo "  Explore your footprint by:"
+echo "    • Project  — per workspace/repo, with its top agent"
 echo "    • Agent    — Claude Code, Codex, Cursor, Gemini CLI …"
 echo "    • Provider — Anthropic, OpenAI, Google, xAI …"
 echo "    • Model    — claude-opus-4-6, gpt-4o, gemini-2-flash …"
+echo "    • Month    — monthly CO₂/water/cost/token totals"
 echo "    • Timeline — daily breakdown with all metrics"
 echo ""
 echo "  Click any column header to sort."
