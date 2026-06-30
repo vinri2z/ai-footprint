@@ -1,0 +1,14 @@
+{
+  "changes": [
+    {
+      "description": "read footprint data live from tokscale instead of an intermediary SQLite store, and rename the project from claude-footprint/claude-carbon to ai-footprint (package, repo slug, default paths ~/.claude/ai-footprint + ~/code/ai-footprint, and AI_FOOTPRINT_* env vars). Reports now query tokscale on demand via the new scripts/footprint-data.sh; the carbon.db store, the ingest/recompute/backfill scripts, and the Stop/SessionStart persistence hooks are removed.",
+      "type": "major"
+    },
+    {
+      "description": "switch installer to a public curl one-liner (repo is now public) and update all repo references from datamaraneers/ai-footprint to vinri2z/ai-footprint",
+      "type": "patch"
+    }
+  ],
+  "created_at": "2026-06-30T07:50:19+00:00",
+  "version": "2.0.0"
+}

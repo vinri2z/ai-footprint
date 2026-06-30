@@ -1,4 +1,0 @@
-{
-  "type": "major",
-  "description": "read footprint data live from tokscale instead of an intermediary SQLite store, and rename the project from claude-footprint/claude-carbon to ai-footprint (package, repo slug, default paths ~/.claude/ai-footprint + ~/code/ai-footprint, and AI_FOOTPRINT_* env vars). Reports now query tokscale on demand via the new scripts/footprint-data.sh; the carbon.db store, the ingest/recompute/backfill scripts, and the Stop/SessionStart persistence hooks are removed."
-}
