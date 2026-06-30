@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "description": "add AGENTS.md agent instructions (Four Rules) and CLAUDE.md import",
+      "type": "patch"
+    }
+  ],
+  "created_at": "2026-06-30T10:53:46+00:00",
+  "version": "2.0.1"
+}
