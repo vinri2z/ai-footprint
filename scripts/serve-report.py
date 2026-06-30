@@ -236,7 +236,14 @@ HTML = """\
       min-height: 2px;
       transition: background 0.12s;
     }
-    .vchart-bar-col:hover .vchart-bar { background: var(--accent); }
+    .vchart-bar-col:hover .vchart-bar:not(.stack) { background: var(--accent); }
+    .vchart-bar.stack {
+      display: flex;
+      flex-direction: column-reverse;
+      background: transparent;
+      overflow: hidden;
+    }
+    .vchart-seg { width: 100%; }
     .vchart-labels {
       display: flex;
       gap: 4px;
@@ -251,6 +258,25 @@ HTML = """\
       overflow: hidden;
       white-space: nowrap;
       text-overflow: ellipsis;
+    }
+    .vchart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-top: 10px;
+    }
+    .vchart-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .vchart-legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
     }
 
     /* ── Equivalences ────────────────────────────────────────────────────── */
@@ -439,7 +465,7 @@ HTML = """\
   <!-- ── Monthly chart ────────────────────────────────────────────────── -->
   <div class="section">
     <div class="section-head">
-      <div class="section-title">monthly breakdown</div>
+      <div class="section-title" id="chart-title">monthly breakdown</div>
       <div style="display:flex;gap:8px;align-items:center">
         <div class="range-sel" id="series-sel">
           <button class="range-btn active" data-s="co2">CO₂</button>
@@ -455,6 +481,7 @@ HTML = """\
       </div>
     </div>
     <div id="chart"></div>
+    <div class="vchart-legend" id="chart-legend"></div>
   </div>
 
   <!-- ── Equivalences ─────────────────────────────────────────────────── -->
@@ -464,12 +491,24 @@ HTML = """\
       <div class="equiv-lbl">km by car (120 gCO₂/km)</div>
     </div>
     <div class="equiv-tile">
-      <div class="equiv-val" id="eq-tgv">–</div>
-      <div class="equiv-lbl">km by TGV (2.4 gCO₂/km)</div>
-    </div>
-    <div class="equiv-tile">
       <div class="equiv-val" id="eq-google">–</div>
       <div class="equiv-lbl">Google searches (0.2 gCO₂)</div>
+    </div>
+    <div class="equiv-tile">
+      <div class="equiv-val" id="eq-flights">–</div>
+      <div class="equiv-lbl">Paris↔NY flights (400 kg CO₂/pax)</div>
+    </div>
+    <div class="equiv-tile">
+      <div class="equiv-val" id="eq-kwh">–</div>
+      <div class="equiv-lbl">kWh estimated energy</div>
+    </div>
+    <div class="equiv-tile">
+      <div class="equiv-val" id="eq-ev">–</div>
+      <div class="equiv-lbl">km by electric car (0.18 kWh/km)</div>
+    </div>
+    <div class="equiv-tile">
+      <div class="equiv-val" id="eq-tgv">–</div>
+      <div class="equiv-lbl">km by TGV (0.056 kWh/pkm)</div>
     </div>
     <div class="equiv-tile">
       <div class="equiv-val" id="eq-bottles">–</div>
@@ -680,9 +719,15 @@ function refreshHero() {
 function refreshEquiv() {
   const d = pd();
   const co2 = d.co2 || 0, water = d.water || 0;
+  // kWh backed out of CO2 via CIF (287 gCO2e/kWh, see METHODOLOGY.md); EV and TGV km
+  // are both derived from that energy estimate, not from a separate CO2/km factor.
+  const kwh = co2 / 287;
   document.getElementById('eq-car').textContent     = numFmt(co2 / 120);
-  document.getElementById('eq-tgv').textContent     = numFmt(co2 / 2.4);
   document.getElementById('eq-google').textContent  = numFmt(co2 / 0.2);
+  document.getElementById('eq-flights').textContent = numFmt(co2 / 400000, 3);
+  document.getElementById('eq-kwh').textContent     = numFmt(kwh, 2);
+  document.getElementById('eq-ev').textContent      = numFmt(kwh / 0.18);
+  document.getElementById('eq-tgv').textContent     = numFmt(kwh / 0.056);
   document.getElementById('eq-bottles').textContent = numFmt(water / 0.5);
   document.getElementById('eq-showers').textContent = (water / 65).toFixed(1);
 }
@@ -709,16 +754,13 @@ document.querySelectorAll('#range-sel .range-btn').forEach(b => {
   });
 });
 
-// Months matching the active period (Today/This Year/All Time), then trimmed
+// Months matching the active period (This Year/All Time), then trimmed
 // to the active range filter.  Keeps the chart in sync with the header period.
 function monthsForView() {
   let months = D.by_month || [];
   if (period === 'year') {
     const y = String(new Date().getFullYear());
     months = months.filter(m => m.month.startsWith(y));
-  } else if (period === 'today') {
-    const ym = new Date().toISOString().slice(0, 7);
-    months = months.filter(m => m.month === ym);
   }
   if (chartRange !== 'all') {
     months = months.slice(-parseInt(chartRange, 10));
@@ -727,7 +769,19 @@ function monthsForView() {
 }
 
 function buildChart() {
-  document.querySelectorAll('#range-sel .range-btn').forEach(b => { b.disabled = (period === 'today'); });
+  document.getElementById('range-sel').style.display = (period === 'today') ? 'none' : '';
+  document.getElementById('chart-title').textContent = (period === 'today') ? 'today by hour, by model' : 'monthly breakdown';
+  document.getElementById('chart-legend').innerHTML = '';
+  if (period === 'today') {
+    buildHourlyChart();
+  } else {
+    buildMonthlyChart();
+  }
+}
+
+const MODEL_PALETTE = ['#f55c0f', '#1d1d1f', '#c9a227', '#0f7a8c', '#8c3f8f', '#4f8c3f'];
+
+function buildMonthlyChart() {
   const months = monthsForView();
   const el = document.getElementById('chart');
   if (!months.length) {
@@ -759,6 +813,56 @@ function buildChart() {
 
   el.innerHTML = '<div class="vchart-bars-area">' + bars + '</div>'
     + '<div class="vchart-labels">' + labels + '</div>';
+}
+
+// today's usage, stacked per hour by model. tokscale can't split tokens by model within
+// an hour, so a mixed hour is an estimate (split by each model's overall share of today) —
+// see footprint-data.sh for how by_hour is built.
+function buildHourlyChart() {
+  const rows = D.by_hour || [];
+  const el = document.getElementById('chart');
+  if (!rows.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:14px;padding:20px 0">No data yet today.</div>';
+    return;
+  }
+
+  const FMTS = { co2: co2Str, water: waterStr, cost: costStr, tokens: tokStr };
+  const fmtVal = v => FMTS[chartSeries](v);
+
+  const hours  = [...new Set(rows.map(r => r.hour))].sort();
+  const models = [...new Set(rows.map(r => r.model))]
+    .sort((a, b) => rows.filter(r => r.model === b).reduce((s, r) => s + (r[chartSeries] || 0), 0)
+                   - rows.filter(r => r.model === a).reduce((s, r) => s + (r[chartSeries] || 0), 0));
+  const colorFor = m => MODEL_PALETTE[models.indexOf(m) % MODEL_PALETTE.length];
+
+  const byHour = {};
+  rows.forEach(r => { (byHour[r.hour] = byHour[r.hour] || {})[r.model] = r[chartSeries] || 0; });
+
+  const totals = hours.map(h => models.reduce((s, m) => s + (byHour[h][m] || 0), 0));
+  const maxVal = Math.max(...totals, 1);
+
+  const bars = hours.map((h, i) => {
+    const barPct = (totals[i] / maxVal * 100).toFixed(2);
+    const segs = models.map(m => {
+      const v = byHour[h][m] || 0;
+      if (!v) return '';
+      const segPct = (v / totals[i] * 100).toFixed(2);
+      return '<div class="vchart-seg" style="height:' + segPct + '%;background:' + colorFor(m) + '" title="' + m + ': ' + fmtVal(v) + '"></div>';
+    }).join('');
+    return '<div class="vchart-bar-col">'
+      + '<div class="vchart-bar-val">' + fmtVal(totals[i]) + '</div>'
+      + '<div class="vchart-bar stack" style="height:' + barPct + '%">' + segs + '</div>'
+      + '</div>';
+  }).join('');
+
+  const labels = hours.map(h => '<div class="vchart-lbl">' + h.slice(11, 16) + '</div>').join('');
+
+  el.innerHTML = '<div class="vchart-bars-area">' + bars + '</div>'
+    + '<div class="vchart-labels">' + labels + '</div>';
+
+  document.getElementById('chart-legend').innerHTML = models.map(m =>
+    '<div class="vchart-legend-item"><span class="vchart-legend-dot" style="background:' + colorFor(m) + '"></span>' + m + '</div>'
+  ).join('');
 }
 
 // ── Tab switching ──────────────────────────────────────────────────────────

@@ -156,7 +156,24 @@ The reported cost is the estimated API list value of the usage (what it would co
 | Car                   | 120 gCO2e/km    | ADEME 2024 (thermal vehicle, average) |
 | Google search         | 0.2 gCO2e       | Google Environmental Report 2023      |
 | Email with attachment | 19 gCO2e        | ADEME 2024                            |
-| TGV                   | 2.4 gCO2e/km    | SNCF 2023 Environmental Report        |
+| Flight (Paris↔New York) | 400 kg CO2e/pax | Average of major-carrier one-way estimates (Air France, Delta, American), economy, direct CO2 only |
+
+### Energy-based equivalences (kWh, not gCO2e/km)
+
+Electric car and TGV equivalences back out an **energy estimate** from the session's CO2, then compare it to that mode's own electricity consumption — both run on electricity, so kWh-to-kWh avoids re-applying a grid carbon intensity that matches neither mode's actual power source.
+
+```
+energy_kWh       = session_co2_grams / 287   # CIF = 0.287 kgCO2e/kWh = 287 gCO2e/kWh (US grid average, see above)
+km_electric_car  = energy_kWh / 0.18         # kWh/km
+km_tgv           = energy_kWh / 0.056        # kWh/passenger-km
+```
+
+| Mode         | Energy factor          | Source                                                                                  |
+| ------------ | ----------------------- | ---------------------------------------------------------------------------------------- |
+| Electric car | 0.18 kWh/km             | EV Database / ICCT 2024 (real-world average, EU full-electric fleet, ~18-21 kWh/100km)  |
+| TGV          | 0.056 kWh/passenger-km  | IEEE Spectrum, "Fast Trains Are Energy Efficient" (French TGV, 0.2 MJ/passenger-km)     |
+
+This replaces the previous TGV equivalence, which used SNCF's 2.4 gCO2e/km emission factor (France's largely nuclear/hydro grid, ~60 gCO2e/kWh) — applying the US-grid CIF used elsewhere in this methodology to TGV's own energy consumption instead keeps the whole report on one consistent energy-to-emissions conversion.
 
 ### Water equivalences
 
