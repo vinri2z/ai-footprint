@@ -196,41 +196,61 @@ HTML = """\
       box-shadow: 0 1px 4px rgba(29,29,31,0.10);
     }
     .range-btn:disabled { opacity: 0.4; cursor: default; }
-    .bar-row {
+
+    /* Vertical timeseries bar chart */
+    .vchart-bars-area {
       display: flex;
-      align-items: center;
-      margin-bottom: 7px;
+      align-items: flex-end;
+      gap: 4px;
+      height: 160px;
+      border-bottom: 1px solid var(--border);
+      padding: 0 2px;
     }
-    .bar-lbl {
-      font-family: "Clash Display", sans-serif;
-      font-weight: 500;
-      font-size: 12px;
-      color: var(--muted);
-      width: 52px;
-      flex-shrink: 0;
-    }
-    .bar-track {
+    .vchart-bar-col {
       flex: 1;
-      height: 18px;
-      background: var(--track);
-      border-radius: 3px;
-      overflow: hidden;
-      margin: 0 12px;
-    }
-    .bar-fill {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       height: 100%;
-      background: var(--bar);
-      border-radius: 3px;
-      min-width: 3px;
+      justify-content: flex-end;
+      cursor: default;
+      position: relative;
     }
-    .bar-val {
+    .vchart-bar-val {
       font-family: "Clash Display", sans-serif;
-      font-weight: 600;
-      font-size: 12px;
-      color: var(--text);
-      width: 72px;
-      text-align: right;
-      flex-shrink: 0;
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      max-width: 100%;
+      text-align: center;
+      opacity: 0;
+      transition: opacity 0.12s;
+    }
+    .vchart-bar-col:hover .vchart-bar-val { opacity: 1; }
+    .vchart-bar {
+      width: 100%;
+      background: var(--bar);
+      border-radius: 2px 2px 0 0;
+      min-height: 2px;
+      transition: background 0.12s;
+    }
+    .vchart-bar-col:hover .vchart-bar { background: var(--accent); }
+    .vchart-labels {
+      display: flex;
+      gap: 4px;
+      padding: 6px 2px 0;
+    }
+    .vchart-lbl {
+      flex: 1;
+      font-family: "Clash Display", sans-serif;
+      font-size: 10px;
+      color: var(--muted);
+      text-align: center;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }
 
     /* ── Equivalences ────────────────────────────────────────────────────── */
@@ -419,11 +439,19 @@ HTML = """\
   <!-- ── Monthly chart ────────────────────────────────────────────────── -->
   <div class="section">
     <div class="section-head">
-      <div class="section-title">monthly CO₂ breakdown</div>
-      <div class="range-sel" id="range-sel">
-        <button class="range-btn active" data-r="6">6M</button>
-        <button class="range-btn" data-r="12">12M</button>
-        <button class="range-btn" data-r="all">All</button>
+      <div class="section-title">monthly breakdown</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="range-sel" id="series-sel">
+          <button class="range-btn active" data-s="co2">CO₂</button>
+          <button class="range-btn" data-s="water">Water</button>
+          <button class="range-btn" data-s="cost">Cost</button>
+          <button class="range-btn" data-s="tokens">Tokens</button>
+        </div>
+        <div class="range-sel" id="range-sel">
+          <button class="range-btn active" data-r="6">6M</button>
+          <button class="range-btn" data-r="12">12M</button>
+          <button class="range-btn" data-r="all">All</button>
+        </div>
       </div>
     </div>
     <div id="chart"></div>
@@ -660,11 +688,21 @@ function refreshEquiv() {
 }
 
 // ── Monthly chart ──────────────────────────────────────────────────────────
-let chartRange = '6';  // '6' | '12' | 'all' — trailing months shown
+let chartRange  = '6';   // '6' | '12' | 'all'
+let chartSeries = 'co2'; // 'co2' | 'water' | 'cost' | 'tokens'
 
-document.querySelectorAll('.range-btn').forEach(b => {
+document.querySelectorAll('#series-sel .range-btn').forEach(b => {
   b.addEventListener('click', () => {
-    document.querySelectorAll('.range-btn').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('#series-sel .range-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    chartSeries = b.dataset.s;
+    buildChart();
+  });
+});
+
+document.querySelectorAll('#range-sel .range-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('#range-sel .range-btn').forEach(x => x.classList.remove('active'));
     b.classList.add('active');
     chartRange = b.dataset.r;
     buildChart();
@@ -689,22 +727,38 @@ function monthsForView() {
 }
 
 function buildChart() {
-  // 'today' is a single month — range filter is meaningless there.
-  document.querySelectorAll('.range-btn').forEach(b => { b.disabled = (period === 'today'); });
+  document.querySelectorAll('#range-sel .range-btn').forEach(b => { b.disabled = (period === 'today'); });
   const months = monthsForView();
   const el = document.getElementById('chart');
-  if (!months.length) { el.textContent = 'No data yet.'; return; }
-  const maxCo2 = Math.max(...months.map(m => m.co2 || 0));
-  el.innerHTML = months.map(m => {
-    const pct = maxCo2 > 0 ? (m.co2 / maxCo2 * 100).toFixed(1) : 0;
-    const d = new Date(m.month + '-02'); // +2 avoids UTC-offset day-1 issues
-    const lbl = d.toLocaleString('en', { month:'short' }) + " '" + String(d.getFullYear()).slice(2);
-    return '<div class="bar-row">'
-      + '<div class="bar-lbl">' + lbl + '</div>'
-      + '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%"></div></div>'
-      + '<div class="bar-val">' + co2Str(m.co2) + '</div>'
+  if (!months.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:14px;padding:20px 0">No data yet.</div>';
+    return;
+  }
+
+  const FMTS = { co2: co2Str, water: waterStr, cost: costStr, tokens: tokStr };
+  const getVal = m => (m[chartSeries] || 0);
+  const fmtVal = v => FMTS[chartSeries](v);
+
+  const vals   = months.map(getVal);
+  const maxVal = Math.max(...vals, 1);
+
+  const bars = months.map((m, i) => {
+    const v   = vals[i];
+    const pct = (v / maxVal * 100).toFixed(1);
+    return '<div class="vchart-bar-col">'
+      + '<div class="vchart-bar-val">' + fmtVal(v) + '</div>'
+      + '<div class="vchart-bar" style="height:' + pct + '%"></div>'
       + '</div>';
   }).join('');
+
+  const labels = months.map(m => {
+    const d   = new Date(m.month + '-02'); // +2 avoids UTC-offset day-1 issues
+    const lbl = d.toLocaleString('en', { month: 'short' }) + " '" + String(d.getFullYear()).slice(2);
+    return '<div class="vchart-lbl">' + lbl + '</div>';
+  }).join('');
+
+  el.innerHTML = '<div class="vchart-bars-area">' + bars + '</div>'
+    + '<div class="vchart-labels">' + labels + '</div>';
 }
 
 // ── Tab switching ──────────────────────────────────────────────────────────

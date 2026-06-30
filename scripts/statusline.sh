@@ -60,7 +60,7 @@ else
 fi
 
 # Format water with adaptive unit (mL under 1 L, else L)
-WATER_DISPLAY="$(echo "$WATER_L" | LC_ALL=C awk '{ if ($1 >= 1) printf "%.1fL", $1; else printf "%.0fmL", $1*1000 }')"
+WATER_DISPLAY="$(echo "$WATER_L" | LC_ALL=C awk '{ if ($1 >= 1000) printf "%.2fm\302\263", $1/1000; else if ($1 >= 1) printf "%.1fL", $1; else printf "%.0fmL", $1*1000 }')"
 
 # Round cost to 2 decimals
 COST_DISPLAY="$(echo "$COST_USD" | LC_ALL=C awk '{printf "%.2f", $1}')"
