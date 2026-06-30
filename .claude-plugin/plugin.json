@@ -1,6 +1,6 @@
 {
   "name": "ai-footprint",
-  "version": "2.4.1",
+  "version": "2.5.0",
   "description": "Track the carbon and water footprint of all your AI coding agents",
   "author": {
     "name": "Vincent Rizzo",
