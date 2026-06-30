@@ -57,7 +57,7 @@ Accurate on every plan, including Max 20x.
 ## Example report
 
 <p align="center">
-  <img src="docs/example-report-v2.png" alt="Claude Carbon Report" width="540">
+  <img src="docs/example-report-v2.png" alt="AI Footprint report card" width="540">
 </p>
 
 Generate yours with `/footprint-card` in Claude Code. Exports summary and detailed PNGs to `exports/`.
