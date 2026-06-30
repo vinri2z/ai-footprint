@@ -157,12 +157,42 @@ HTML = """\
 
     /* ── Monthly chart ───────────────────────────────────────────────────── */
     .section { margin-bottom: 28px; }
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
     .section-title {
       font-size: 13px;
       color: var(--muted);
       font-style: italic;
-      margin-bottom: 14px;
     }
+    .range-sel {
+      display: flex;
+      gap: 3px;
+      background: var(--track);
+      border-radius: 7px;
+      padding: 3px;
+    }
+    .range-btn {
+      font-family: "Clash Display", sans-serif;
+      font-weight: 500;
+      font-size: 12px;
+      padding: 3px 11px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+    }
+    .range-btn.active {
+      background: var(--bg);
+      color: var(--text);
+      box-shadow: 0 1px 4px rgba(29,29,31,0.10);
+    }
+    .range-btn:disabled { opacity: 0.4; cursor: default; }
     .bar-row {
       display: flex;
       align-items: center;
@@ -385,7 +415,14 @@ HTML = """\
 
   <!-- ── Monthly chart ────────────────────────────────────────────────── -->
   <div class="section">
-    <div class="section-title">monthly CO₂ breakdown</div>
+    <div class="section-head">
+      <div class="section-title">monthly CO₂ breakdown</div>
+      <div class="range-sel" id="range-sel">
+        <button class="range-btn active" data-r="6">6M</button>
+        <button class="range-btn" data-r="12">12M</button>
+        <button class="range-btn" data-r="all">All</button>
+      </div>
+    </div>
     <div id="chart"></div>
   </div>
 
@@ -536,7 +573,7 @@ HTML = """\
   <!-- ── Footer ───────────────────────────────────────────────────────── -->
   <div class="footer">
     <div class="footer-logo">ai <span>footprint</span></div>
-    <span class="footer-link">github.com/datamaraneers/ai-footprint</span>
+    <span class="footer-link">github.com/vinri2z/ai-footprint</span>
     <span class="footer-badge">open source</span>
   </div>
 
@@ -560,7 +597,7 @@ function co2Hero(g) {
 }
 function waterStr(l) {
   if (l == null) return '–';
-  if (l >= 1e3)  return (l/1e3).toFixed(2) + ' kL';
+  if (l >= 1e3)  return (l/1e3).toFixed(2) + ' m³';
   if (l >= 1)    return l.toFixed(2) + ' L';
   return (l*1e3).toFixed(0) + ' mL';
 }
@@ -591,6 +628,7 @@ document.querySelectorAll('.period-btn').forEach(b => {
     period = b.dataset.p;
     refreshHero();
     refreshEquiv();
+    buildChart();
   });
 });
 
@@ -619,8 +657,38 @@ function refreshEquiv() {
 }
 
 // ── Monthly chart ──────────────────────────────────────────────────────────
+let chartRange = '6';  // '6' | '12' | 'all' — trailing months shown
+
+document.querySelectorAll('.range-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.range-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    chartRange = b.dataset.r;
+    buildChart();
+  });
+});
+
+// Months matching the active period (Today/This Year/All Time), then trimmed
+// to the active range filter.  Keeps the chart in sync with the header period.
+function monthsForView() {
+  let months = D.by_month || [];
+  if (period === 'year') {
+    const y = String(new Date().getFullYear());
+    months = months.filter(m => m.month.startsWith(y));
+  } else if (period === 'today') {
+    const ym = new Date().toISOString().slice(0, 7);
+    months = months.filter(m => m.month === ym);
+  }
+  if (chartRange !== 'all') {
+    months = months.slice(-parseInt(chartRange, 10));
+  }
+  return months;
+}
+
 function buildChart() {
-  const months = D.by_month || [];
+  // 'today' is a single month — range filter is meaningless there.
+  document.querySelectorAll('.range-btn').forEach(b => { b.disabled = (period === 'today'); });
+  const months = monthsForView();
   const el = document.getElementById('chart');
   if (!months.length) { el.textContent = 'No data yet.'; return; }
   const maxCo2 = Math.max(...months.map(m => m.co2 || 0));
