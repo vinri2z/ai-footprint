@@ -69,3 +69,5 @@ make version                           # print current version
 ```
 
 **Every PR must add a `.semversioner/next-release/*.json` changeset** — CI (`changeset-required`) fails without one. Run `make add-change` before opening the PR.
+
+This is enforced locally too: `.claude/settings.json` registers a `PreToolUse` hook (`scripts/hooks/require-changeset.sh`) that blocks `gh pr create` until a changeset is pending, so the failure surfaces before the PR is pushed instead of in CI.

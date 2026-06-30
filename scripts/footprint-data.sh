@@ -25,7 +25,7 @@ set -euo pipefail
 #
 # Output JSON (all CO2 in grams, water in liters, cost in USD):
 #   { today, year, all, first_date, last_date,
-#     by_agent[], by_provider[], by_model[], by_month[], by_day[] }
+#     by_agent[], by_project[], by_provider[], by_model[], by_month[], by_day[] }
 # where each total object is { co2, water, cost, tokens, agents, models }.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -84,7 +84,10 @@ for f in "${FAMS[@]}"; do
 done
 
 # emit_bucket <granularity: month|day> <bucket-key> — runs tokscale for one time bucket and
-# prints computed TSV rows: gran bucket client provider model family input output cr cw co2 water cost excluded
+# prints computed TSV rows: gran bucket client provider model family input output cr cw co2 water cost excluded workspace
+#
+# Grouped by workspace,model so a single tokscale pass yields the project (workspace) dimension
+# alongside client/provider/model — totals are identical to a client,provider,model grouping.
 emit_bucket() {
   local gran="$1" bucket="$2" since until
   if [ "$gran" = "month" ]; then
@@ -95,12 +98,12 @@ emit_bucket() {
   fi
 
   local entries
-  entries="$(run_tokscale models --json --group-by client,provider,model --since "$since" --until "$until" \
-    | jq -r '.entries[]? | [(.client//"unknown"),(.provider//"unknown"),(.model//"unknown"),(.input//0),(.output//0),(.cacheRead//0),(.cacheWrite//0),(.reasoning//0),(.cost//0)] | @tsv' || true)"
+  entries="$(run_tokscale models --json --group-by workspace,model --since "$since" --until "$until" \
+    | jq -r '.entries[]? | [(.client//"unknown"),(.provider//"unknown"),(.model//"unknown"),(.input//0),(.output//0),(.cacheRead//0),(.cacheWrite//0),(.reasoning//0),(.cost//0),(.workspaceLabel//"unknown")] | @tsv' || true)"
   [ -n "$entries" ] || return 0
 
-  local client provider model input output cache_read cache_write reasoning cost
-  while IFS=$'\t' read -r client provider model input output cache_read cache_write reasoning cost; do
+  local client provider model input output cache_read cache_write reasoning cost workspace
+  while IFS=$'\t' read -r client provider model input output cache_read cache_write reasoning cost workspace; do
     [ -n "${model:-}" ] || continue
     local out_total=$(( ${output:-0} + ${reasoning:-0} ))
     local family co2 water excluded
@@ -114,9 +117,9 @@ emit_bucket() {
       read -r co2 water <<< "$(compute_footprint "$input" "$cache_write" "$cache_read" "$out_total" "$fin" "$fout" "$win" "$wout")"
       excluded=0
     fi
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
       "$gran" "$bucket" "$client" "$provider" "$model" "$family" \
-      "${input:-0}" "$out_total" "${cache_read:-0}" "${cache_write:-0}" "$co2" "$water" "${cost:-0}" "$excluded"
+      "${input:-0}" "$out_total" "${cache_read:-0}" "${cache_write:-0}" "$co2" "$water" "${cost:-0}" "$excluded" "${workspace:-unknown}"
   done <<< "$entries"
 }
 
@@ -143,12 +146,25 @@ for M in $MONTHS; do emit_bucket month "$M" >> "$ROWS_FILE"; done
 for D in $DAYS;   do emit_bucket day   "$D" >> "$ROWS_FILE"; done
 
 # --- Aggregate the rows into the report JSON --------------------------------
-TODAY="$TODAY" python3 - "$ROWS_FILE" <<'PYEOF'
+HOME="$HOME" TODAY="$TODAY" python3 - "$ROWS_FILE" <<'PYEOF'
 import json, os, sys
 from collections import defaultdict
 
 today = os.environ["TODAY"]
 year = today[:4]
+
+# tokscale encodes a workspace path by replacing "/" with "-" (e.g. /Users/me/proj -> -Users-me-proj).
+# Strip the user's home prefix for a readable project label; keep the raw label as the unique key.
+home_prefix = os.environ.get("HOME", "").replace("/", "-")
+
+def project_label(workspace):
+    if not workspace or workspace == "unknown":
+        return "unknown"
+    label = workspace
+    if home_prefix and label.startswith(home_prefix):
+        label = label[len(home_prefix):]
+    return label.lstrip("-") or workspace.lstrip("-") or workspace
+
 rows = []
 with open(sys.argv[1]) as f:
     for line in f:
@@ -156,13 +172,15 @@ with open(sys.argv[1]) as f:
         if not line:
             continue
         (gran, bucket, client, provider, model, family,
-         inp, out, cr, cw, co2, water, cost, excluded) = line.split("\t")
+         inp, out, cr, cw, co2, water, cost, excluded, workspace) = line.split("\t")
         rows.append(dict(
             gran=gran, bucket=bucket, client=client, provider=provider,
             model=model, family=family,
             input=int(inp), output=int(out), cache_read=int(cr), cache_write=int(cw),
             co2=float(co2), water=float(water), cost=float(cost),
             excluded=int(excluded),
+            workspace=(workspace or "unknown"),
+            project=project_label(workspace),
         ))
 
 monthly = [r for r in rows if r["gran"] == "month" and not r["excluded"]]
@@ -214,8 +232,20 @@ data = {
         lambda row, grp: row.update(
             model_count=len({r["model"] for r in grp}),
             provider_count=len({r["provider"] for r in grp}),
+            project_count=len({r["workspace"] for r in grp}),
             first_date=min(r["bucket"] for r in grp) + "-01",
             last_date=max(r["bucket"] for r in grp) + "-01",
+        ),
+    ),
+    "by_project": group(
+        monthly, lambda r: r["project"], "project",
+        lambda row, grp: row.update(
+            agent_count=len({r["client"] for r in grp}),
+            model_count=len({r["model"] for r in grp}),
+            top_agent=max(
+                ({r["client"] for r in grp}),
+                key=lambda c: sum(r["co2"] for r in grp if r["client"] == c),
+            ),
         ),
     ),
     "by_provider": group(
@@ -234,7 +264,12 @@ data = {
         ),
     ),
     "by_month": sorted(
-        group(monthly, lambda r: r["bucket"], "month"),
+        group(monthly, lambda r: r["bucket"], "month",
+              lambda row, grp: row.update(
+                  agent_count=len({r["client"] for r in grp}),
+                  model_count=len({r["model"] for r in grp}),
+                  project_count=len({r["workspace"] for r in grp}),
+              )),
         key=lambda x: x["month"],
     ),
     "by_day": sorted(
