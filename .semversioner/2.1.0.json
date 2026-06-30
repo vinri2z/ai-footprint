@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "description": "Add By Project and By Month breakdowns to the interactive footprint report",
+      "type": "minor"
+    }
+  ],
+  "created_at": "2026-06-30T13:03:06+00:00",
+  "version": "2.1.0"
+}
