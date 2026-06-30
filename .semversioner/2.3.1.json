@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "description": "remove Datamaran branding: delete dm-logo-ai.svg and scrub datamaran mentions",
+      "type": "patch"
+    }
+  ],
+  "created_at": "2026-06-30T14:54:22+00:00",
+  "version": "2.3.1"
+}
