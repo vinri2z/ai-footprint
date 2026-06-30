@@ -14,7 +14,7 @@
         "url": "https://github.com/vinri2z/ai-footprint.git"
       },
       "description": "Track the carbon and water footprint of all your AI coding agents",
-      "version": "2.2.0",
+      "version": "2.3.0",
       "author": {
         "name": "Vincent Rizzo"
       },
