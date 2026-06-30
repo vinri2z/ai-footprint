@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "description": "Refresh README example with current ai-footprint report card (v2 branding, CO2 + water)",
+      "type": "patch"
+    }
+  ],
+  "created_at": "2026-06-30T12:57:27+00:00",
+  "version": "2.0.2"
+}
