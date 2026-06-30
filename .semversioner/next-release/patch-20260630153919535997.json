@@ -1,0 +1,4 @@
+{
+  "type": "patch",
+  "description": "fix: skills resolve repo root dynamically instead of hardcoding ~/code/ai-footprint"
+}

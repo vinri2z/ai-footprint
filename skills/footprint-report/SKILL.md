@@ -9,12 +9,20 @@ Run the following bash script exactly as written and present the output to the u
 #!/usr/bin/env bash
 export LC_ALL=C
 
-SCRIPT="${HOME}/code/ai-footprint/scripts/serve-report.py"
 PORT=7331
 
+# Resolve the repo root relative to this skill file, falling back to ~/code/ai-footprint
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+REPO_ROOT="$(cd "$SKILL_DIR/../.." 2>/dev/null && pwd)"
+SCRIPT="${REPO_ROOT}/scripts/serve-report.py"
+
+# Fallback for legacy installs
 if [ ! -f "$SCRIPT" ]; then
-  echo "Server script not found at $SCRIPT"
-  echo "Install ai-footprint first, or run: bash ~/code/ai-footprint/scripts/setup.sh"
+  SCRIPT="${HOME}/code/ai-footprint/scripts/serve-report.py"
+fi
+
+if [ ! -f "$SCRIPT" ]; then
+  echo "Server script not found. Re-run the installer or set AI_FOOTPRINT_DIR."
   exit 1
 fi
 
