@@ -4,7 +4,7 @@
     "name": "Vincent Rizzo"
   },
   "metadata": {
-    "description": "Track the carbon and water footprint of your Claude Code sessions"
+    "description": "Track the carbon and water footprint of all your AI coding agents"
   },
   "plugins": [
     {
@@ -13,8 +13,8 @@
         "source": "url",
         "url": "https://github.com/vinri2z/ai-footprint.git"
       },
-      "description": "Track the carbon and water footprint of your Claude Code sessions",
-      "version": "1.4.0",
+      "description": "Track the carbon and water footprint of all your AI coding agents",
+      "version": "1.5.0",
       "author": {
         "name": "Vincent Rizzo"
       },

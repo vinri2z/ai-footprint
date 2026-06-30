@@ -108,7 +108,7 @@ if command -v jq &>/dev/null; then
 
   # Priority 2: fallback to GET /api/oauth/usage with 60s cache.
   if [ -z "$FIVE_PCT" ]; then
-    USAGE_CACHE_DIR="${HOME}/.claude/claude-carbon"
+    USAGE_CACHE_DIR="${HOME}/.claude/ai-footprint"
     USAGE_CACHE_FILE="${USAGE_CACHE_DIR}/oauth-usage.json"
     USAGE_CACHE_TTL=60
     mkdir -p "$USAGE_CACHE_DIR"

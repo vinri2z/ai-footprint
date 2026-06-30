@@ -1,6 +1,6 @@
 ---
 name: footprint-card
-description: Generate shareable PNG report cards of your Claude Code carbon + water footprint
+description: Generate shareable PNG report cards of your AI coding agents' carbon + water footprint
 ---
 
 Run the following bash command and present the output to the user. Show the exported file paths so they can share the PNGs.

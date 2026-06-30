@@ -2,8 +2,8 @@
 # run-vectors.sh — Replay tests/methodology-vectors.json against the plugin's CO2/water math.
 #
 # CO2 + water are validated against the REAL shared code (scripts/lib-factors.sh: resolve_family,
-# is_excluded, factor, compute_footprint) so the test tracks ingest-tokscale.sh / recompute.sh
-# exactly. cost_usd is validated only for Claude families (prices.json) — for non-Anthropic
+# is_excluded, factor, compute_footprint) so the test tracks footprint-data.sh exactly.
+# cost_usd is validated only for Claude families (prices.json) — for non-Anthropic
 # agents the footprint pipeline takes cost straight from tokscale, so those vectors set
 # expected_cost_usd: null and the cost check is skipped.
 #
@@ -22,7 +22,7 @@ command -v jq >/dev/null 2>&1 || { echo "FAIL: jq is required" >&2; exit 1; }
 [ -f "$PRICES_FILE" ] || { echo "FAIL: missing $PRICES_FILE" >&2; exit 1; }
 [ -f "$VECTORS_FILE" ] || { echo "FAIL: missing $VECTORS_FILE" >&2; exit 1; }
 
-# Source the production helpers so the test validates the same code ingest/recompute use.
+# Source the production helpers so the test validates the same code footprint-data.sh uses.
 # shellcheck source=../scripts/lib-factors.sh
 source "${SCRIPT_DIR}/../scripts/lib-factors.sh"
 

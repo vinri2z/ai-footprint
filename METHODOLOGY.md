@@ -8,7 +8,9 @@ Token usage is collected across **all** local AI coding agents — not just Clau
 
 ## Token usage source
 
-[tokscale](https://github.com/junhoyeo/tokscale) scans the local session stores of 30+ AI coding agents and reports per-`(client, provider, model)` token counts (`input`, `output`, `cacheRead`, `cacheWrite`, `reasoning`) plus an estimated `cost`. `scripts/ingest-tokscale.sh` calls it once per day (`tokscale models --json --group-by client,provider,model --since D --until D`), maps each model to a family (below), computes CO2 + water with the formula below, and upserts one row per `(date, client, provider, model)` into the `usage` table. It is the single source of persisted usage; `reasoning` tokens are folded into output (they are generated tokens). `cost_usd` is taken straight from tokscale (multi-provider), not recomputed.
+[tokscale](https://github.com/junhoyeo/tokscale) scans the local session stores of 30+ AI coding agents and reports per-`(client, provider, model)` token counts (`input`, `output`, `cacheRead`, `cacheWrite`, `reasoning`) plus an estimated `cost`. `scripts/footprint-data.sh` queries it directly at report time (`tokscale models --json --group-by client,provider,model --since … --until …`), maps each model to a family (below), computes CO2 + water with the formula below, and prints an aggregated JSON document that the report consumers render. There is **no database**: every report run reads tokscale live, so the numbers are always current and nothing is persisted between runs. `reasoning` tokens are folded into output (they are generated tokens). `cost` is taken straight from tokscale (multi-provider), not recomputed.
+
+Because tokscale's `models` report cannot group by date, the time-series views are built by looping tokscale over time buckets: a month loop (earliest month with data → today) backs the all-time/year totals and the by-agent/by-provider/by-model/by-month aggregates, and a day loop over a trailing window (default 35 days) backs the daily timeline and "today".
 
 ## Source
 
@@ -112,21 +114,17 @@ Sources: AWS 2024 sustainability report (onsite WUE); Li et al. 2023, "Making AI
 
 ## Excluded models
 
-Unlike the Claude-only era, non-Anthropic models are **no longer excluded** — they map to a provider-agnostic tier and receive an estimate (see Family mapping). Only rows that represent no real inference are excluded: the `<synthetic>` marker (non-billed synthetic turns) and any user-added pattern in the `exclude_models` list in `data/factors.json`. Excluded rows are stored with their raw token counts but `co2_grams = 0`, `water_liters = 0` and `excluded = 1`, and are left out of all report aggregates. Because raw tokens are preserved, exclusion is reversible: edit `exclude_models` and run `recompute.sh`.
+Unlike the Claude-only era, non-Anthropic models are **no longer excluded** — they map to a provider-agnostic tier and receive an estimate (see Family mapping). Only entries that represent no real inference are excluded: the `<synthetic>` marker (non-billed synthetic turns) and any user-added pattern in the `exclude_models` list in `data/factors.json`. Excluded entries contribute zero CO2/water and are left out of all report aggregates. Exclusion takes effect immediately on the next report run: edit `exclude_models` in `data/factors.json` — there is nothing to recompute because CO2/water are derived live from tokscale every time.
 
 ## Token counting and deduplication
 
-Token counts come from tokscale, which reads each agent's native session store and is responsible for deduplication and per-model attribution across all 30+ clients (for Claude Code this replaces the previous bespoke JSONL `(message.id, requestId)` dedup). `ingest-tokscale.sh` snapshots tokscale's per-day, per-`(client, provider, model)` totals into the `usage` table; `reasoning` tokens are added to `output`.
+Token counts come from tokscale, which reads each agent's native session store and is responsible for deduplication and per-model attribution across all 30+ clients (for Claude Code this replaces the previous bespoke JSONL `(message.id, requestId)` dedup). `footprint-data.sh` consumes tokscale's per-`(client, provider, model)` totals for each time bucket; `reasoning` tokens are added to `output`.
 
-## Surviving the 30-day transcript purge
+## Live data, no store
 
-Agents purge their local session stores on their own schedules (Claude Code at ~30 days), so the SQLite `usage` table is the only durable record. Two design choices follow:
+There is no database. Every report run reads tokscale directly and recomputes CO2/water from `data/factors.json` on the spot, so reports always reflect the current factors and the current on-disk usage — editing a factor or the family mapping changes the next report with nothing to migrate or recompute.
 
-1. **Snapshot before purge.** `ingest-tokscale.sh` writes per-day rows while the data is still on disk. The `Stop` hook (`persist-session.sh`) re-ingests *today* (throttled, detached) after each session; a throttled `SessionStart` hook (`safety-rescan.sh`) re-ingests the recent ~35-day window once a day to catch anything missed and to pick up agents used outside Claude Code. The only unavoidable gaps are history older than the install date and downtime longer than an agent's retention window.
-
-2. **Store raw tokens, derive on demand.** Each row stores the raw token breakdown: `input_tokens`, `output_tokens` (incl. reasoning), `cache_read_tokens`, and `cache_write_tokens`. CO2 and water are pure functions of these counts plus `data/factors.json`, so they can be regenerated at any time with `recompute.sh` without re-running tokscale. When a factor (or the family mapping) is revised, edit `factors.json` and run `recompute.sh`. `cost_usd` is stored as captured from tokscale and is not recomputed.
-
-`recompute.sh` re-resolves each distinct model's family via the current `family_patterns`, so a model's tier follows the latest mapping even if it was ingested under an older one.
+The trade-off is retention. tokscale only sees what each agent keeps on disk, and agents purge their local session stores on their own schedules (Claude Code at ~30 days). Because nothing is snapshotted, usage older than an agent's retention window — and daily resolution older than the trailing day-window — is not reconstructable. Month-level totals remain available for as long as tokscale still reports that month. This is the deliberate consequence of reading tokscale directly rather than maintaining a separate store.
 
 ## Cache read energy
 
@@ -140,7 +138,7 @@ Sources: GreenCache (arXiv:2505.23970), TokenPowerBench (arXiv:2512.03024), Solo
 
 ## Cost estimate
 
-The `cost_usd` column is the estimated API list value of the usage (what it would cost on pay-as-you-go), not the subscription price actually paid. It is taken directly from tokscale, which maintains real-time per-provider pricing (LiteLLM with an OpenRouter fallback) across all clients, including cache read/write discounts. `data/prices.json` (Anthropic list pricing) is still used by the live status line (`statusline.sh`), which estimates the in-flight Claude Code session's cost before tokscale has seen it.
+The reported cost is the estimated API list value of the usage (what it would cost on pay-as-you-go), not the subscription price actually paid. It is taken directly from tokscale, which maintains real-time per-provider pricing (LiteLLM with an OpenRouter fallback) across all clients, including cache read/write discounts. `data/prices.json` (Anthropic list pricing) is still used by the live status line (`statusline.sh`), which estimates the in-flight Claude Code session's cost before tokscale has seen it.
 
 ## Limitations
 

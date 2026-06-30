@@ -1,7 +1,7 @@
 {
   "name": "ai-footprint",
-  "version": "1.4.0",
-  "description": "Track the carbon and water footprint of your Claude Code sessions",
+  "version": "1.5.0",
+  "description": "Track the carbon and water footprint of all your AI coding agents",
   "author": {
     "name": "Vincent Rizzo",
     "url": "https://github.com/vinri2z"
@@ -16,7 +16,6 @@
     "claude-code",
     "green-it"
   ],
-  "hooks": "./hooks/hooks.json",
   "skills": "./skills/",
   "statusLine": {
     "type": "command",

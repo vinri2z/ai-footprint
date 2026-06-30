@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# generate-report.sh — Generate Claude Footprint Report PNGs (CO2 + water) from DB stats.
+# generate-report.sh — Generate AI Footprint Report PNGs (CO2 + water) from live tokscale data.
 # Usage: generate-report.sh [--since YYYY-MM-DD] [--all]
 # Default: since January 1st of current year. Output is English only.
 set -euo pipefail
@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 TEMPLATE_DIR="$PROJECT_DIR/templates"
 EXPORT_DIR="$PROJECT_DIR/exports"
-DB_PATH="${CLAUDE_CARBON_DB:-${HOME}/.claude/claude-carbon/carbon.db}"
+DATA_SCRIPT="$SCRIPT_DIR/footprint-data.sh"
 TODAY="$(date +%Y-%m-%d)"
 YEAR="$(date +%Y)"
 
@@ -16,6 +16,7 @@ YEAR="$(date +%Y)"
 SINCE="${YEAR}-01-01"
 SINCE_LABEL="January ${YEAR}"
 LABEL_AUTO=1   # default mode: derive the "since" label from the earliest real session
+DATA_ARGS=(--since "${YEAR}-01-01")
 
 # Full month names for the auto-derived label (index 1-12)
 MONTHS_EN=("" "January" "February" "March" "April" "May" "June" "July" "August" "September" "October" "November" "December")
@@ -26,12 +27,14 @@ while [[ $# -gt 0 ]]; do
       SINCE="$2"
       SINCE_LABEL="$2"
       LABEL_AUTO=0
+      DATA_ARGS=(--since "$2")
       shift 2
       ;;
     --all)
       SINCE=""
       SINCE_LABEL="the beginning"
       LABEL_AUTO=0
+      DATA_ARGS=(--all)
       shift
       ;;
     *)
@@ -41,49 +44,36 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Build SQL WHERE clause (always filters out excluded rows, e.g. <synthetic>)
-if [ -n "$SINCE" ]; then
-  WHERE="WHERE COALESCE(excluded, 0) = 0 AND date >= '${SINCE}'"
-else
-  WHERE="WHERE COALESCE(excluded, 0) = 0"
-fi
-
 # ── Deps check ──────────────────────────────────────────────
-for cmd in sqlite3 node; do
+for cmd in jq node python3; do
   if ! command -v "$cmd" &>/dev/null; then
     echo "Error: $cmd is required but not found." >&2
     exit 1
   fi
 done
 
-if [ ! -f "$DB_PATH" ]; then
-  echo "Error: carbon.db not found. Run setup.sh first." >&2
-  exit 1
-fi
-
 mkdir -p "$EXPORT_DIR"
 
-if ! sqlite3 "$DB_PATH" "SELECT 1 FROM usage LIMIT 1;" >/dev/null 2>&1; then
-  echo "Error: no multi-agent usage yet. Run: bash scripts/ingest-tokscale.sh" >&2
-  exit 1
-fi
+# ── Query tokscale directly (no database) ───────────────────
+echo "Querying tokscale (since ${SINCE_LABEL})... this can take a moment."
+DATA_JSON="$(bash "$DATA_SCRIPT" "${DATA_ARGS[@]}")" || { echo "Error: failed to query tokscale." >&2; exit 1; }
+[ -n "$DATA_JSON" ] || { echo "Error: no usage data from tokscale." >&2; exit 1; }
 
-# ── Query DB (usage table; one row per date/client/provider/model) ──────────
-echo "Querying carbon.db (since ${SINCE_LABEL})..."
+j() { printf '%s' "$DATA_JSON" | jq -r "$1"; }
 
 # TOTAL_AGENTS = distinct tokscale clients (Claude Code, Codex, Cursor, ...)
-read -r TOTAL_AGENTS TOTAL_CO2_RAW TOTAL_COST_RAW FIRST_DATE_RAW <<< \
-  "$(sqlite3 "$DB_PATH" "SELECT COUNT(DISTINCT client), COALESCE(SUM(co2_grams), 0), COALESCE(SUM(cost_usd), 0), COALESCE(MIN(date), '') FROM usage ${WHERE};" | tr '|' ' ')"
+IFS=$'\t' read -r TOTAL_AGENTS TOTAL_CO2_RAW TOTAL_COST_RAW FIRST_DATE_RAW <<< \
+  "$(j '[.all.agents, .all.co2, .all.cost, (.first_date // "")] | @tsv')"
 
-TOTAL_WATER_RAW="$(sqlite3 "$DB_PATH" "SELECT COALESCE(SUM(water_liters), 0) FROM usage ${WHERE};")"
+TOTAL_WATER_RAW="$(j '.all.water')"
 
 # Top 5 agents (tokscale client) with their distinct-model count
-TOP_PROJECTS="$(sqlite3 -separator '|' "$DB_PATH" "SELECT client, SUM(co2_grams), COUNT(DISTINCT model) FROM usage ${WHERE} GROUP BY client ORDER BY SUM(co2_grams) DESC LIMIT 5;")"
+TOP_PROJECTS="$(j '.by_agent[:5][] | [(.client), (.co2|tostring), (.model_count|tostring)] | join("|")')"
 
-TOP_MODEL="$(sqlite3 "$DB_PATH" "SELECT model FROM usage ${WHERE} GROUP BY model ORDER BY SUM(co2_grams) DESC LIMIT 1;")"
+TOP_MODEL="$(j '.by_model[0].model // ""')"
 
-# Total tokens
-TOTAL_TOKENS_RAW="$(sqlite3 "$DB_PATH" "SELECT COALESCE(SUM(input_tokens), 0) + COALESCE(SUM(output_tokens), 0) FROM usage ${WHERE};")"
+# Total tokens (input + output, matching the old report — excludes cache)
+TOTAL_TOKENS_RAW="$(j '.all.io_tokens')"
 
 # ── Format values ───────────────────────────────────────────
 format_co2() {
@@ -139,16 +129,17 @@ if [ "$DAYS_ELAPSED" -gt 0 ]; then
   # Linear: average daily rate extrapolated (in tCO2 with 1 decimal)
   PROJ_LINEAR="$(echo "$TOTAL_CO2_RAW $DAYS_ELAPSED" | LC_ALL=C awk '{printf "%.1f", ($1 / $2) * 365 / 1000000}')"
 
-  # Trend: last 30 days daily rate extrapolated
-  if [ -n "$WHERE" ]; then
-    LAST_MONTH_DATA="$(sqlite3 "$DB_PATH" "SELECT SUM(co2_grams), MIN(date), MAX(date) FROM usage ${WHERE} AND date >= date('now', '-30 days');" | tr '|' ' ')"
+  # Trend: last 30 days daily rate extrapolated (from the daily timeline)
+  CUTOFF_30="$(python3 -c 'import datetime;print((datetime.date.today()-datetime.timedelta(days=30)).isoformat())')"
+  IFS=$'\t' read -r LAST_MONTH_CO2 LAST_MONTH_START LAST_MONTH_END <<< \
+    "$(printf '%s' "$DATA_JSON" | jq -r --arg c "$CUTOFF_30" '
+      [.by_day[] | select(.date >= $c)] |
+      [ (map(.co2) | add // 0), (if length>0 then (min_by(.date).date) else "" end), (if length>0 then (max_by(.date).date) else "" end) ] | @tsv')"
+  if [ -n "$LAST_MONTH_START" ] && [ -n "$LAST_MONTH_END" ]; then
+    LAST_MONTH_DAYS="$(( ( $(date -j -f "%Y-%m-%d" "${LAST_MONTH_END}" +%s 2>/dev/null || date -d "${LAST_MONTH_END}" +%s 2>/dev/null) - $(date -j -f "%Y-%m-%d" "${LAST_MONTH_START}" +%s 2>/dev/null || date -d "${LAST_MONTH_START}" +%s 2>/dev/null) ) / 86400 ))"
   else
-    LAST_MONTH_DATA="$(sqlite3 "$DB_PATH" "SELECT SUM(co2_grams), MIN(date), MAX(date) FROM usage WHERE date >= date('now', '-30 days');" | tr '|' ' ')"
+    LAST_MONTH_DAYS=0
   fi
-  LAST_MONTH_CO2="$(echo "$LAST_MONTH_DATA" | LC_ALL=C awk '{print $1}')"
-  LAST_MONTH_START="$(echo "$LAST_MONTH_DATA" | LC_ALL=C awk '{print $2}' | cut -c1-10)"
-  LAST_MONTH_END="$(echo "$LAST_MONTH_DATA" | LC_ALL=C awk '{print $3}' | cut -c1-10)"
-  LAST_MONTH_DAYS="$(( ( $(date -j -f "%Y-%m-%d" "${LAST_MONTH_END}" +%s 2>/dev/null || date -d "${LAST_MONTH_END}" +%s 2>/dev/null) - $(date -j -f "%Y-%m-%d" "${LAST_MONTH_START}" +%s 2>/dev/null || date -d "${LAST_MONTH_START}" +%s 2>/dev/null) ) / 86400 ))"
   if [ "$LAST_MONTH_DAYS" -gt 0 ]; then
     PROJ_TREND="$(echo "$LAST_MONTH_CO2 $LAST_MONTH_DAYS" | LC_ALL=C awk '{printf "%.1f", ($1 / $2) * 365 / 1000000}')"
   else
@@ -167,7 +158,7 @@ fi
 TOP_MODEL_DISPLAY="$(echo "$TOP_MODEL" | sed 's/^[a-z_]*\.//; s/^anthropic\.//; s/^eu\.anthropic\.//; s/claude-//; s/-4-6//; s/-4-5.*//')"
 
 # ── Monthly bars data (injected into HTML by python below) ──
-MONTHLY_DATA="$(sqlite3 -separator '|' "$DB_PATH" "SELECT substr(date, 1, 7), SUM(co2_grams) FROM usage ${WHERE} GROUP BY substr(date, 1, 7) ORDER BY substr(date, 1, 7);")"
+MONTHLY_DATA="$(j '.by_month[] | [(.month), (.co2|tostring)] | join("|")')"
 
 # ── Parse top 5 agents (P_SESSIONS now holds the distinct-model count) ──────
 declare -a P_NAME P_CO2 P_SESSIONS
@@ -226,13 +217,13 @@ inject_common() {
 }
 
 # Generate templates (English only)
-_t=$(mktemp /tmp/claude-footprint-summary-XXXXXX); TMP_SUMMARY="${_t}.html"; mv "$_t" "$TMP_SUMMARY"
-_t=$(mktemp /tmp/claude-footprint-detailed-XXXXXX); TMP_DETAILED="${_t}.html"; mv "$_t" "$TMP_DETAILED"
+_t=$(mktemp /tmp/ai-footprint-summary-XXXXXX); TMP_SUMMARY="${_t}.html"; mv "$_t" "$TMP_SUMMARY"
+_t=$(mktemp /tmp/ai-footprint-detailed-XXXXXX); TMP_DETAILED="${_t}.html"; mv "$_t" "$TMP_DETAILED"
 inject_common "$TEMPLATE_DIR/report-summary.html" "$TMP_SUMMARY"
 inject_common "$TEMPLATE_DIR/report-detailed.html" "$TMP_DETAILED"
 
 # Inject monthly bars via python (bash/sed can't handle % in style attrs)
-_t=$(mktemp /tmp/claude-footprint-monthly-XXXXXX); TMP_MONTHLY="${_t}.txt"; mv "$_t" "$TMP_MONTHLY"
+_t=$(mktemp /tmp/ai-footprint-monthly-XXXXXX); TMP_MONTHLY="${_t}.txt"; mv "$_t" "$TMP_MONTHLY"
 echo "$MONTHLY_DATA" > "$TMP_MONTHLY"
 
 export TMP_SUMMARY TMP_MONTHLY
@@ -355,8 +346,8 @@ const { chromium } = require('${PW_PATH}');
   fi
 }
 
-export_png "$TMP_SUMMARY" "$EXPORT_DIR/claude-footprint-summary-${TODAY}.png" "Summary"
-export_png "$TMP_DETAILED" "$EXPORT_DIR/claude-footprint-detailed-${TODAY}.png" "Detailed"
+export_png "$TMP_SUMMARY" "$EXPORT_DIR/ai-footprint-summary-${TODAY}.png" "Summary"
+export_png "$TMP_DETAILED" "$EXPORT_DIR/ai-footprint-detailed-${TODAY}.png" "Detailed"
 
 echo ""
 echo "Done. ${EXPORT_DIR}/"

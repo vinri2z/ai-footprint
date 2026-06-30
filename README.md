@@ -1,7 +1,7 @@
 # ai-footprint
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![GitHub release](https://img.shields.io/badge/release-v1.4.0-blue)](https://github.com/vinri2z/ai-footprint/releases)
+[![GitHub release](https://img.shields.io/badge/release-v1.5.0-blue)](https://github.com/vinri2z/ai-footprint/releases)
 
 Track the carbon **and water** footprint of **all your AI coding agents** — Claude Code, Codex, Cursor, Gemini CLI, Copilot, OpenCode, and 30+ more — in one place.
 
@@ -10,7 +10,7 @@ Token usage is collected across every agent via [tokscale](https://github.com/ju
 **1. Install (or update):**
 
 ```bash
-gh api repos/vinri2z/ai-footprint/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
+curl -fsSL https://raw.githubusercontent.com/vinri2z/ai-footprint/main/install.sh | bash
 ```
 
 Same command to install and to update to the latest version.
@@ -23,7 +23,7 @@ ai-footprint ⌥ main | 🟢 Opus 4.7 ▓▓▓░░░░░░░ 35% | 🪵 
 
 Segments, left to right: project + git branch, model + context window %, CO2 + water + session cost, 5h block usage % + reset time. A 🔥 prefix appears when the sustained burn rate would overshoot 100% of the limit by the end of the 5h block (after a 15 min grace window, only once usage reaches 15%).
 
-The CO2 and water emoji cycle through a short loop on every status-line refresh — CO2 runs 🌳 → 🪵 → 🔥 → 💨 and water runs 🧊 → 💦 → 💧 → 💨. Claude Code throttles status-line refreshes to ~300ms while active, so it reads as an animation at roughly that cadence. The frame advances one step per refresh via a counter at `~/.claude/claude-carbon/anim-frame`.
+The CO2 and water emoji cycle through a short loop on every status-line refresh — CO2 runs 🌳 → 🪵 → 🔥 → 💨 and water runs 🧊 → 💦 → 💧 → 💨. The frame index is derived from the wall clock (`epoch_seconds % 4`), so it advances one step per second regardless of the refresh cadence; Claude Code refreshes the status line frequently while active, so it reads as an animation.
 
 On a narrow terminal the segments wrap onto additional rows (no truncation, no ellipsis) — e.g. at ~60 columns:
 
@@ -38,18 +38,18 @@ Wrapping uses the `$COLUMNS` width Claude Code provides (requires Claude Code v2
 **5h quota source.** The percentage comes directly from Anthropic's `/api/oauth/usage` endpoint (the same data Claude Code displays in `/usage`). No heuristic, no token-limit file to seed. Two sources in order:
 
 1. **stdin** (preferred): if Claude Code injects `rate_limits.five_hour.used_percentage` in the statusline JSON, that value is used straight away.
-2. **OAuth API fallback**: `GET https://api.anthropic.com/api/oauth/usage` with the bearer token from macOS Keychain, `CLAUDE_CODE_OAUTH_TOKEN`, or `~/.claude/.credentials.json`. Cached 60s in `~/.claude/claude-carbon/oauth-usage.json`.
+2. **OAuth API fallback**: `GET https://api.anthropic.com/api/oauth/usage` with the bearer token from macOS Keychain, `CLAUDE_CODE_OAUTH_TOKEN`, or `~/.claude/.credentials.json`. Cached 60s in `~/.claude/ai-footprint/oauth-usage.json`.
 
 Accurate on every plan, including Max 20x.
 
 **3. Use the slash commands:**
 
-- `/footprint-report` - text report with totals, equivalences, by-agent and by-provider breakdowns
+- `/footprint-report` - interactive web dashboard with totals, equivalences, by-agent/provider/model breakdowns and a daily timeline
 - `/footprint-card` - generate shareable PNG report cards (requires `playwright-core`, see [Dependencies](#dependencies))
 
 ## What it does
 
-- Collects token usage across **all** local AI coding agents via [tokscale](https://github.com/junhoyeo/tokscale), persisted to a local SQLite database (one row per day / agent / provider / model)
+- Reads token usage across **all** local AI coding agents straight from [tokscale](https://github.com/junhoyeo/tokscale) on demand — no database, no background jobs
 - Estimates CO2 + water for every model — Anthropic and non-Anthropic alike — and breaks the footprint down by agent and provider
 - Adds a live CO2 + water estimate for the in-flight Claude Code session to the status line, alongside session cost
 - Two slash commands: `/footprint-report` (text) and `/footprint-card` (PNG)
@@ -79,7 +79,7 @@ bash ~/code/ai-footprint/scripts/generate-report.sh --all
 <summary>Custom install directory</summary>
 
 ```bash
-CLAUDE_FOOTPRINT_DIR=~/my-path/ai-footprint gh api repos/vinri2z/ai-footprint/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
+AI_FOOTPRINT_DIR=~/my-path/ai-footprint bash -c 'curl -fsSL https://raw.githubusercontent.com/vinri2z/ai-footprint/main/install.sh | bash'
 ```
 
 </details>
@@ -88,7 +88,7 @@ CLAUDE_FOOTPRINT_DIR=~/my-path/ai-footprint gh api repos/vinri2z/ai-footprint/co
 <summary>Manual install</summary>
 
 ```bash
-gh repo clone vinri2z/ai-footprint ~/code/ai-footprint
+git clone https://github.com/vinri2z/ai-footprint.git ~/code/ai-footprint
 bash ~/code/ai-footprint/scripts/setup.sh
 ```
 
@@ -99,35 +99,11 @@ Then add to `~/.claude/settings.json`:
   "statusLine": {
     "type": "command",
     "command": "~/code/ai-footprint/scripts/statusline.sh"
-  },
-  "hooks": {
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/code/ai-footprint/scripts/persist-session.sh"
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/code/ai-footprint/scripts/safety-rescan.sh"
-          }
-        ]
-      }
-    ]
   }
 }
 ```
 
-Restart Claude Code.
+No background hooks are needed — reports read from tokscale on demand. Restart Claude Code.
 
 </details>
 
@@ -135,30 +111,28 @@ Restart Claude Code.
 
 **One data source, plus a live display:**
 
-| Script                | Trigger                       | Data source                 | Coverage             | Role                          |
-| --------------------- | ----------------------------- | --------------------------- | -------------------- | ----------------------------- |
-| `ingest-tokscale.sh`  | setup / Stop hook / daily     | tokscale (`models --json`)  | All 30+ agents       | Single source for reports     |
-| `statusline.sh`       | Every turn (live)             | `context_window` JSON       | Claude Code only     | Live display (not persisted)  |
+| Script               | Trigger              | Data source                | Coverage         | Role                         |
+| -------------------- | -------------------- | -------------------------- | ---------------- | ---------------------------- |
+| `footprint-data.sh`  | Every report run     | tokscale (`models --json`) | All 30+ agents   | Single source for reports    |
+| `statusline.sh`      | Every turn (live)    | `context_window` JSON      | Claude Code only | Live display (not persisted) |
 
-**ingest-tokscale** runs [tokscale](https://github.com/junhoyeo/tokscale) one day at a time (`tokscale models --json --group-by client,provider,model --since D --until D`), which reads each agent's native session store and reports per-`(client, provider, model)` token counts (and handles dedup/attribution itself). Each model is mapped to a family, CO2 + water are computed with the per-model factors, and one row per `(date, client, provider, model)` is upserted into the SQLite `usage` table. Re-ingesting a day is idempotent. `reasoning` tokens are folded into output.
+**footprint-data** runs [tokscale](https://github.com/junhoyeo/tokscale) directly when a report is requested (`tokscale models --json --group-by client,provider,model --since … --until …`), which reads each agent's native session store and reports per-`(client, provider, model)` token counts (and handles dedup/attribution itself). Each model is mapped to a family, CO2 + water are computed with the per-model factors, and an aggregated JSON document is emitted for the report consumers. There is no database — every run reads tokscale live, so reports are always current. tokscale's `models` report can't group by date, so the daily timeline and monthly chart are built by looping it over time buckets (a month loop for full history, a day loop over a trailing ~35-day window). `reasoning` tokens are folded into output.
 
-**Cost** is taken directly from tokscale, which keeps real-time per-provider pricing (cache discounts included) across all agents — so the cost column is correct for OpenAI, Google, etc., not just Anthropic.
+**Cost** is taken directly from tokscale, which keeps real-time per-provider pricing (cache discounts included) across all agents — so the cost is correct for OpenAI, Google, etc., not just Anthropic.
 
-**statusline** reads `context_window.total_input_tokens` from Claude Code at each turn for an indicative live CO2/water/cost readout of the current Claude Code session. It is display-only and never written to the database (so it can't double-count what tokscale already captures).
+**statusline** reads `context_window.total_input_tokens` from Claude Code at each turn for an indicative live CO2/water/cost readout of the current Claude Code session. It is display-only (so it can't double-count what tokscale already captures).
 
-### Surviving the transcript purge
+### Live data, no store
 
-Agents purge their local session stores on their own schedules (Claude Code at ~30 days), so the SQLite database is the durable record. `ingest-tokscale.sh` snapshots usage daily while it's still on disk: the `Stop` hook re-ingests *today* after each session (throttled, detached), and a once-a-day `SessionStart` re-scan (`safety-rescan.sh`) re-ingests the recent ~35-day window to catch misses and pick up agents used outside Claude Code. Because each row stores raw token counts, `recompute.sh` regenerates CO2 and water from `data/factors.json` at any time, with no transcript or tokscale run needed. When a factor or the family mapping is revised, edit the config and run:
+There is no database. Every report reads tokscale directly and recomputes CO2/water from `data/factors.json` on the spot, so changing a factor or the family mapping takes effect on the next report with nothing to migrate or recompute — just edit `data/factors.json`.
 
-```bash
-bash scripts/recompute.sh
-```
+The trade-off is retention: tokscale only sees what each agent keeps on disk, and agents purge their local session stores on their own schedules (Claude Code at ~30 days). Because nothing is snapshotted, usage older than an agent's retention window — and daily resolution older than the trailing day-window — is not reconstructable. Month-level totals stay available for as long as tokscale still reports that month.
 
 ## Commands
 
 | Command          | What it does                                        |
 | ---------------- | --------------------------------------------------- |
-| `/footprint-report` | Text report with CO2 + water totals, equivalences, by-agent and by-provider breakdowns |
+| `/footprint-report` | Interactive web dashboard with CO2 + water totals, equivalences, by-agent/provider/model breakdowns and a daily timeline |
 | `/footprint-card`   | Generate shareable PNG report cards (CO2 + water)   |
 
 <details>
@@ -166,16 +140,12 @@ bash scripts/recompute.sh
 
 | Script               | What it does                                                                              |
 | -------------------- | ----------------------------------------------------------------------------------------- |
-| `setup.sh`           | Init database, run the tokscale backfill, show total                                       |
-| `ingest-tokscale.sh` | Pull per-day usage from tokscale into the `usage` table (`--today` / `--days N` / range / full backfill) |
-| `lib-factors.sh`     | Shared helpers: family mapping + CO2/water computation (sourced by ingest + recompute)     |
+| `setup.sh`           | Check dependencies, print a one-shot footprint summary from tokscale                       |
+| `footprint-data.sh`  | Query tokscale and emit aggregated footprint JSON (`--all` / `--since D [--until D]` / `--day-window N`) |
+| `lib-factors.sh`     | Shared helpers: family mapping + CO2/water computation (sourced by `footprint-data.sh`)    |
 | `statusline.sh`      | Status line script (called automatically by Claude Code; live Claude-only display)         |
-| `persist-session.sh` | Stop hook (re-ingests today's usage, throttled + detached)                                 |
-| `safety-rescan.sh`   | SessionStart hook (throttled background re-ingest of the recent window)                    |
-| `recompute.sh`       | Re-derive CO2/water from stored tokens after a factor/mapping change (no tokscale run needed) |
+| `serve-report.py`    | Interactive dashboard server backing `/footprint-report` (reads `footprint-data.sh`)       |
 | `generate-report.sh` | Export PNG report cards (CLI, with `--since` / `--all`)                                   |
-
-Note: `backfill.sh` (the old JSONL parser) is superseded by `ingest-tokscale.sh` and is no longer wired into setup or the hooks.
 
 </details>
 
@@ -227,14 +197,13 @@ The methodology is pinned by golden test vectors in [`tests/methodology-vectors.
 ## Dependencies
 
 - `jq` - JSON parsing
-- `sqlite3` - local database
-- `python3` - date math + report rendering
+- `python3` - date math + report aggregation + dashboard rendering
 - `node` / `npx` - runs [tokscale](https://github.com/junhoyeo/tokscale) (the token-usage source) via `npx tokscale@latest`; also used for PNG export
 - `git` - branch detection in status line (optional)
 - `curl` - 5h quota usage via Anthropic's `/api/oauth/usage` endpoint (optional, 60s cache)
 - `playwright-core` + Chromium - PNG export for `/footprint-card` (optional)
 
-`jq`, `sqlite3` and `python3` are pre-installed on macOS. On Linux: `apt install jq sqlite3 python3`. Install Node (for tokscale) from [nodejs.org](https://nodejs.org) or `brew install node`. tokscale itself needs no separate install — it is fetched on demand by `npx`.
+`jq` and `python3` are pre-installed on macOS. On Linux: `apt install jq python3`. Install Node (for tokscale) from [nodejs.org](https://nodejs.org) or `brew install node`. tokscale itself needs no separate install — it is fetched on demand by `npx`.
 
 To use `/footprint-card`, install Playwright and its Chromium browser:
 

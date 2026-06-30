@@ -1,4 +1,4 @@
-# claude-footprint — semver release tooling (semversioner-backed)
+# ai-footprint — semver release tooling (semversioner-backed)
 #
 #   make add-change BUMP=minor MSG="..."   record a changeset under .semversioner/next-release
 #   make release                           consume changesets: bump, regen CHANGELOG, commit + tag
@@ -25,7 +25,7 @@ VERSION := $(shell semversioner current-version 2>/dev/null || jq -r .version $(
 .PHONY: help version add-change release changelog
 
 help:
-	@echo "claude-footprint release tooling (semversioner)"
+	@echo "ai-footprint release tooling (semversioner)"
 	@echo ""
 	@echo "  make add-change BUMP=major|minor|patch MSG=\"...\"  record a changeset"
 	@echo "  make release                                       bump, regen CHANGELOG, commit + tag"

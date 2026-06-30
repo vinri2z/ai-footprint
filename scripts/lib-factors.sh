@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lib-factors.sh — shared footprint helpers, sourced by ingest-tokscale.sh and recompute.sh.
+# lib-factors.sh — shared footprint helpers, sourced by footprint-data.sh.
 #
 # Maps a model string to a family (data-driven via factors.json family_patterns), exposes the
 # per-family CO2/water factors, and computes CO2/water for a token breakdown using the single
@@ -11,7 +11,7 @@
 # Portable to bash 3.2 (macOS default): no associative arrays. Factor lookups go through jq so
 # adding a family is a factors.json edit only.
 
-FACTORS_FILE="${CLAUDE_CARBON_FACTORS:-${FACTORS_FILE:-}}"
+FACTORS_FILE="${AI_FOOTPRINT_FACTORS:-${FACTORS_FILE:-}}"
 if [ -z "$FACTORS_FILE" ]; then
   _lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   FACTORS_FILE="${_lib_dir}/../data/factors.json"

@@ -1,5 +1,5 @@
 {
-  "_purpose": "Canonical golden vectors for the claude-footprint methodology (CO2, cost, and water). Source of truth shared with downstream consumers (TokenClimate SaaS keeps a byte-identical copy in tests/fixtures/ and checks it weekly). Any change to data/factors.json or data/prices.json MUST update these expected values in the same commit.",
+  "_purpose": "Canonical golden vectors for the ai-footprint methodology (CO2, cost, and water). Source of truth shared with downstream consumers (TokenClimate SaaS keeps a byte-identical copy in tests/fixtures/ and checks it weekly). Any change to data/factors.json or data/prices.json MUST update these expected values in the same commit.",
   "_formulas": {
     "co2_grams": "((input_tokens + cache_creation_tokens) * factor_in + cache_read_tokens * (factor_in * cache_read_factor) + output_tokens * factor_out) / 1e6",
     "cost_usd": "(input_tokens * price_in + cache_creation_tokens * (price_in * cache_write_multiplier) + cache_read_tokens * (price_in * cache_read_multiplier) + output_tokens * price_out) / 1e6",
