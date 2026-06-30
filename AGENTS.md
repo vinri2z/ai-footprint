@@ -20,7 +20,7 @@ Say "I'm not sure" when you're not sure. Don't invent APIs, patterns, or library
 
 ## Working in this repo
 
-This is a Claude Code plugin written in Bash (with a Python helper for the dashboard). There is no build step and no database — every report reads token usage live from [tokscale](https://github.com/junhoyeo/tokscale).
+This is a Claude Code plugin written in Bash (with a Python helper for the dashboard). There is no build step. Token usage comes from [tokscale](https://github.com/junhoyeo/tokscale); computed per-bucket rows are cached in a local SQLite DB (`~/.cache/ai-footprint/footprint.db`) so each run only re-queries live/new buckets. The cache self-invalidates when the tokscale agent set or the CO2/water factors change; set `AI_FOOTPRINT_NO_CACHE=1` to bypass it.
 
 ### Dependencies
 
@@ -55,6 +55,7 @@ echo '{"session_id":"..."}' | bash scripts/statusline.sh
 
 - `scripts/lib-factors.sh` — shared CO2/water math (`resolve_family`, `is_excluded`, `factor`, `compute_footprint`). The single source of truth; tests source it directly.
 - `scripts/footprint-data.sh` / `footprint-live.sh` — pull usage from tokscale and apply the factors.
+- `scripts/footprint-cache.sh` / `footprint-cache.py` — SQLite cache of computed per-bucket rows (sealed past buckets served from the DB; fingerprint-based invalidation).
 - `data/factors.json` — CO2/water emission factors. `data/prices.json` — Claude per-Mtok prices for live session cost.
 - `METHODOLOGY.md` — where the factors come from and how they're applied.
 

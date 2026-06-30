@@ -5,8 +5,10 @@ Starts a local HTTP server with an explorable breakdown by agent, provider,
 model, and daily timeline.  Matches the card design (beige, Clash Display,
 Owner Text, same colour palette).
 
-Data comes live from tokscale via scripts/footprint-data.sh — there is no
-database; every launch queries tokscale directly.
+Data comes from tokscale via scripts/footprint-data.sh, which caches computed
+per-bucket rows in a local SQLite DB so only live buckets are re-queried. The
+server boots from that (warm) cache and then refreshes it on a background thread,
+so reading tokscale stays off the request path.
 """
 
 import argparse
@@ -14,6 +16,7 @@ import json
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -851,7 +854,7 @@ makeTable('tbl-daily', 'body-daily', D.by_day || [], [
 """
 
 # ---------------------------------------------------------------------------
-# Data source — live from tokscale via footprint-data.sh (no database)
+# Data source — tokscale via footprint-data.sh (SQLite-cached, see footprint-cache.*)
 # ---------------------------------------------------------------------------
 
 def query_tokscale(data_script: str) -> dict:
@@ -866,6 +869,27 @@ def query_tokscale(data_script: str) -> dict:
     if not proc.stdout.strip():
         raise RuntimeError("footprint-data.sh produced no output — is tokscale available?")
     return json.loads(proc.stdout)
+
+
+def render_page(data: dict) -> bytes:
+    """Bake the aggregated data into the static HTML page."""
+    return HTML.replace("__DATA__", json.dumps(data, ensure_ascii=False)).encode("utf-8")
+
+
+def background_refresher(data_script: str, interval: int):
+    """Periodically re-run footprint-data.sh and swap in the fresh page.
+
+    Runs as a daemon thread so reading tokscale never blocks an HTTP request: the
+    handler always serves the last successfully rendered page. The first cache-backed
+    run is cheap (only live buckets hit tokscale); a failed refresh keeps the prior page.
+    """
+    while True:
+        time.sleep(interval)
+        try:
+            data = query_tokscale(data_script)
+            Handler.page_bytes = render_page(data)
+        except Exception as e:  # never let a bad refresh kill the server
+            sys.stderr.write(f"background refresh failed: {e}\n")
 
 
 # ---------------------------------------------------------------------------
@@ -899,6 +923,8 @@ def main():
     ap.add_argument("--port",       type=int, default=DEFAULT_PORT, help="TCP port (default 7331)")
     ap.add_argument("--data-script", default=str(DATA_SCRIPT),       help="Path to footprint-data.sh")
     ap.add_argument("--no-browser", action="store_true",            help="Don't open browser automatically")
+    ap.add_argument("--refresh-secs", type=int, default=60,
+                    help="Background cache refresh interval in seconds (0 disables; default 60)")
     args = ap.parse_args()
 
     script = Path(args.data_script)
@@ -906,15 +932,21 @@ def main():
         print(f"error: data script not found at {script}", file=sys.stderr)
         sys.exit(1)
 
-    print("Loading data from tokscale … (this can take a moment)", flush=True)
+    print("Loading data from tokscale … (warm cache makes repeat launches fast)", flush=True)
     try:
         data = query_tokscale(str(script))
     except RuntimeError as e:
         print(f"error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    page = HTML.replace("__DATA__", json.dumps(data, ensure_ascii=False))
-    Handler.page_bytes = page.encode("utf-8")
+    Handler.page_bytes = render_page(data)
+
+    if args.refresh_secs > 0:
+        threading.Thread(
+            target=background_refresher,
+            args=(str(script), args.refresh_secs),
+            daemon=True,
+        ).start()
 
     url = f"http://localhost:{args.port}"
     server = HTTPServer(("", args.port), Handler)

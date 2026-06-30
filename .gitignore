@@ -1,5 +1,8 @@
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
+__pycache__/
 exports/
 docs/private/
 .DS_Store
