@@ -1,0 +1,4 @@
+{
+  "type": "minor",
+  "description": "Document tokscale agent coverage (zero-setup vs login-required agents); setup.sh now smoke-checks tokscale and nudges for un-configured agents"
+}
