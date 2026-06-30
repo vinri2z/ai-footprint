@@ -308,8 +308,6 @@ fi
 echo "Exporting PNGs via Playwright..."
 
 PORT=8799
-# Copy logo to /tmp so the HTTP server can serve it
-cp -f "$TEMPLATE_DIR/dm-logo-ai.svg" /tmp/dm-logo-ai.svg 2>/dev/null || true
 python3 -m http.server "$PORT" --directory /tmp &>/dev/null &
 SERVER_PID=$!
 trap "kill $SERVER_PID 2>/dev/null; rm -f $TMP_SUMMARY $TMP_DETAILED" EXIT

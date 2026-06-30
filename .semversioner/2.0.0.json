@@ -5,7 +5,7 @@
       "type": "major"
     },
     {
-      "description": "switch installer to a public curl one-liner (repo is now public) and update all repo references from datamaraneers/ai-footprint to vinri2z/ai-footprint",
+      "description": "switch installer to a public curl one-liner (repo is now public) and update all repo references to vinri2z/ai-footprint",
       "type": "patch"
     }
   ],
