@@ -49,7 +49,7 @@ Accurate on every plan, including Max 20x.
 
 ## What it does
 
-- Reads token usage across **all** local AI coding agents straight from [tokscale](https://github.com/junhoyeo/tokscale) on demand — no database, no background jobs
+- Reads token usage across **all** local AI coding agents from [tokscale](https://github.com/junhoyeo/tokscale), caching computed results in a local SQLite DB so only live/new buckets are re-queried
 - Estimates CO2 + water for every model — Anthropic and non-Anthropic alike — and breaks the footprint down by agent and provider
 - Adds a live CO2 + water estimate for the in-flight Claude Code session to the status line, alongside session cost
 - Two slash commands: `/footprint-report` (text) and `/footprint-card` (PNG)
@@ -116,7 +116,7 @@ No background hooks are needed — reports read from tokscale on demand. Restart
 | `footprint-data.sh`  | Every report run     | tokscale (`models --json`) | All 30+ agents   | Single source for reports    |
 | `statusline.sh`      | Every turn (live)    | `context_window` JSON      | Claude Code only | Live display (not persisted) |
 
-**footprint-data** runs [tokscale](https://github.com/junhoyeo/tokscale) directly when a report is requested (`tokscale models --json --group-by client,provider,model --since … --until …`), which reads each agent's native session store and reports per-`(client, provider, model)` token counts (and handles dedup/attribution itself). Each model is mapped to a family, CO2 + water are computed with the per-model factors, and an aggregated JSON document is emitted for the report consumers. There is no database — every run reads tokscale live, so reports are always current. tokscale's `models` report can't group by date, so the daily timeline and monthly chart are built by looping it over time buckets (a month loop for full history, a day loop over a trailing ~35-day window). `reasoning` tokens are folded into output.
+**footprint-data** runs [tokscale](https://github.com/junhoyeo/tokscale) directly when a report is requested (`tokscale models --json --group-by client,provider,model --since … --until …`), which reads each agent's native session store and reports per-`(client, provider, model)` token counts (and handles dedup/attribution itself). Each model is mapped to a family, CO2 + water are computed with the per-model factors, and an aggregated JSON document is emitted for the report consumers. tokscale's `models` report can't group by date, so the daily timeline and monthly chart are built by looping it over time buckets (a month loop for full history, a day loop over a trailing ~35-day window). The computed rows for each bucket are cached in a local SQLite DB (`~/.cache/ai-footprint/footprint.db`): buckets wholly in the past are "sealed" and served from the cache, so each run only re-queries tokscale for the current month and recent days. The cache self-invalidates when the tokscale agent set or `data/factors.json` changes (set `AI_FOOTPRINT_NO_CACHE=1` to bypass it). `reasoning` tokens are folded into output.
 
 **Cost** is taken directly from tokscale, which keeps real-time per-provider pricing (cache discounts included) across all agents — so the cost is correct for OpenAI, Google, etc., not just Anthropic.
 
@@ -140,7 +140,7 @@ These commands store their state under `~/.config/tokscale/`, so it persists acr
 
 ### Live data, no store
 
-There is no database. Every report reads tokscale directly and recomputes CO2/water from `data/factors.json` on the spot, so changing a factor or the family mapping takes effect on the next report with nothing to migrate or recompute — just edit `data/factors.json`.
+CO2/water are recomputed from `data/factors.json`, and the results are cached per time bucket in a local SQLite DB. `data/factors.json` is part of the cache fingerprint, so changing a factor or the family mapping invalidates the cache and takes effect on the next report — nothing to migrate or hand-recompute, just edit `data/factors.json`.
 
 The trade-off is retention: tokscale only sees what each agent keeps on disk, and agents purge their local session stores on their own schedules (Claude Code at ~30 days). Because nothing is snapshotted, usage older than an agent's retention window — and daily resolution older than the trailing day-window — is not reconstructable. Month-level totals stay available for as long as tokscale still reports that month.
 

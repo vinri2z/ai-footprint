@@ -6,8 +6,13 @@ set -euo pipefail
 # Reads token usage straight from tokscale (which scans 30+ AI coding agents — Claude Code,
 # Codex, Cursor, Gemini CLI, Copilot, OpenCode, ...), computes CO2 + water with the project
 # methodology (data/factors.json), takes cost straight from tokscale, and prints a single
-# aggregated JSON document on stdout. There is no database: every report run queries tokscale
-# directly, so the numbers are always current and nothing is persisted between runs.
+# aggregated JSON document on stdout.
+#
+# Computed per-bucket rows are cached in a local SQLite DB (footprint-cache.{sh,py}): buckets
+# that lie wholly in the past are "sealed" and read from the cache, so each run only queries
+# tokscale for live buckets (current month, recent days) and any new ones. The cache self-
+# invalidates when the tokscale config / agent set changes. Set AI_FOOTPRINT_NO_CACHE=1 to
+# bypass it and always query tokscale.
 #
 # Because tokscale's `models` report cannot group by date, time-series views are built by
 # looping tokscale over time buckets:
@@ -38,6 +43,12 @@ BACKFILL_CAP_DAYS="${AI_FOOTPRINT_BACKFILL_CAP_DAYS:-400}"
 DAY_WINDOW="${AI_FOOTPRINT_DAY_WINDOW:-35}"
 
 run_tokscale() { $TOKSCALE "$@" --no-spinner 2>/dev/null; }
+
+# SQLite cache: sealed (past) buckets are read from the DB instead of re-querying tokscale,
+# so each run only fetches live/new buckets. Sourced after run_tokscale (cache_fingerprint
+# uses it). See footprint-cache.sh / footprint-cache.py.
+# shellcheck source=footprint-cache.sh
+source "${SCRIPT_DIR}/footprint-cache.sh"
 
 # --- Resolve the date range -------------------------------------------------
 TODAY="$(python3 -c 'import datetime;print(datetime.date.today().isoformat())')"
@@ -142,8 +153,28 @@ DAYS="$(python3 -c "import datetime,sys;a=datetime.date.fromisoformat(sys.argv[1
 ROWS_FILE="$(mktemp "${TMPDIR:-/tmp}/ai-footprint-rows-XXXXXX")"
 trap 'rm -f "$ROWS_FILE"' EXIT
 
-for M in $MONTHS; do emit_bucket month "$M" >> "$ROWS_FILE"; done
-for D in $DAYS;   do emit_bucket day   "$D" >> "$ROWS_FILE"; done
+# Invalidate the cache if the tokscale config / agent set changed; ensure the schema exists.
+cache_init || true
+
+# fetch_bucket: serve a sealed bucket from the cache, otherwise compute it via tokscale and
+# store the result. Keeps the aggregation step (below) identical — it still reads TSV rows.
+fetch_bucket() {
+  local gran="$1" bucket="$2" rows
+  if cache_enabled && rows="$(cache_get "$gran" "$bucket")"; then
+    [ -n "$rows" ] && printf '%s\n' "$rows"
+    return 0
+  fi
+  rows="$(emit_bucket "$gran" "$bucket")"
+  [ -n "$rows" ] && printf '%s\n' "$rows"
+  # Only pipe into cache_put when caching is on — a disabled cache_put would not drain
+  # stdin, and the dangling printf would die with SIGPIPE under `set -o pipefail`.
+  if cache_enabled; then
+    printf '%s' "$rows" | cache_put "$gran" "$bucket"
+  fi
+}
+
+for M in $MONTHS; do fetch_bucket month "$M" >> "$ROWS_FILE"; done
+for D in $DAYS;   do fetch_bucket day   "$D" >> "$ROWS_FILE"; done
 
 # --- Aggregate the rows into the report JSON --------------------------------
 HOME="$HOME" TODAY="$TODAY" python3 - "$ROWS_FILE" <<'PYEOF'

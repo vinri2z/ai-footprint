@@ -1,0 +1,4 @@
+{
+  "type": "minor",
+  "description": "Cache computed tokscale rows in a local SQLite DB (incremental refresh, agent/factor-change invalidation, background dashboard refresh)"
+}
