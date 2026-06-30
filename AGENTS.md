@@ -67,3 +67,5 @@ make add-change BUMP=minor MSG="..."   # record a changeset
 make release                           # bump, regen CHANGELOG, commit + tag
 make version                           # print current version
 ```
+
+**Every PR must add a `.semversioner/next-release/*.json` changeset** — CI (`changeset-required`) fails without one. Run `make add-change` before opening the PR.
