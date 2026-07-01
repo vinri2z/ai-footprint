@@ -1,0 +1,4 @@
+{
+  "type": "patch",
+  "description": "Make footer repo link and open-source badge clickable in dashboard"
+}

@@ -401,14 +401,17 @@ HTML = """\
       font-size: 15px;
     }
     .footer-logo span { color: var(--muted); font-weight: 400; }
-    .footer-link { font-family: "Clash Display", sans-serif; font-size: 13px; color: var(--accent); }
+    .footer-link { font-family: "Clash Display", sans-serif; font-size: 13px; color: var(--accent); text-decoration: none; }
+    .footer-link:hover { text-decoration: underline; }
     .footer-badge {
       font-size: 12px;
       color: var(--muted);
       background: var(--track);
       padding: 5px 13px;
       border-radius: 4px;
+      text-decoration: none;
     }
+    .footer-badge:hover { color: var(--accent); }
 
     /* ── Responsive ──────────────────────────────────────────────────────── */
     @media (max-width: 860px) {
@@ -643,8 +646,8 @@ HTML = """\
   <!-- ── Footer ───────────────────────────────────────────────────────── -->
   <div class="footer">
     <div class="footer-logo">ai <span>footprint</span></div>
-    <span class="footer-link">github.com/vinri2z/ai-footprint</span>
-    <span class="footer-badge">open source</span>
+    <a class="footer-link" href="https://github.com/vinri2z/ai-footprint" target="_blank" rel="noopener">github.com/vinri2z/ai-footprint</a>
+    <a class="footer-badge" href="https://github.com/vinri2z/ai-footprint" target="_blank" rel="noopener">open source</a>
   </div>
 
 </div><!-- .page -->
