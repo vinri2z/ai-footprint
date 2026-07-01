@@ -293,6 +293,12 @@ HTML = """\
       border-right: 1px solid var(--border);
     }
     .equiv-tile:last-child { border-right: none; }
+    .equiv-icon {
+      width: 20px;
+      height: 20px;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
     .equiv-val {
       font-family: "Clash Display", sans-serif;
       font-weight: 700;
@@ -490,34 +496,42 @@ HTML = """\
   <!-- ── Equivalences ─────────────────────────────────────────────────── -->
   <div class="equiv-strip">
     <div class="equiv-tile">
+      <svg class="equiv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5 5.4 11.6A2 2 0 0 1 7.3 10h9.4a2 2 0 0 1 1.9 1.6l1.4 4.9"/><path d="M3 16.5h18v2.5a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H6v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7.5" cy="16.5" r="1.4"/><circle cx="16.5" cy="16.5" r="1.4"/></svg>
       <div class="equiv-val" id="eq-car">–</div>
       <div class="equiv-lbl">km by car (120 gCO₂/km)</div>
     </div>
     <div class="equiv-tile">
+      <svg class="equiv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.3" y2="15.3"/></svg>
       <div class="equiv-val" id="eq-google">–</div>
       <div class="equiv-lbl">Google searches (0.2 gCO₂)</div>
     </div>
     <div class="equiv-tile">
+      <svg class="equiv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9z"/></svg>
       <div class="equiv-val" id="eq-flights">–</div>
       <div class="equiv-lbl">Paris↔NY flights (400 kg CO₂/pax)</div>
     </div>
     <div class="equiv-tile">
+      <svg class="equiv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 5 13h5l-1 9 9-11h-5z"/></svg>
       <div class="equiv-val" id="eq-kwh">–</div>
       <div class="equiv-lbl">kWh estimated energy</div>
     </div>
     <div class="equiv-tile">
+      <svg class="equiv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M12 2v4M6 6h8v5a4 4 0 0 1-4 4 4 4 0 0 1-4-4V6z"/><path d="M10 15v3a3 3 0 0 0 3 3h2"/></svg>
       <div class="equiv-val" id="eq-ev">–</div>
       <div class="equiv-lbl">km by electric car (0.18 kWh/km)</div>
     </div>
     <div class="equiv-tile">
+      <svg class="equiv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="13" rx="4"/><line x1="4" y1="11" x2="20" y2="11"/><line x1="9" y1="17" x2="7" y2="21"/><line x1="15" y1="17" x2="17" y2="21"/></svg>
       <div class="equiv-val" id="eq-tgv">–</div>
       <div class="equiv-lbl">km by TGV (0.056 kWh/pkm)</div>
     </div>
     <div class="equiv-tile">
+      <svg class="equiv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v3l1.5 1.5V20a1.5 1.5 0 0 1-1.5 1.5h-4A1.5 1.5 0 0 1 8.5 20V6.5L10 5z"/><line x1="8.5" y1="10" x2="15.5" y2="10"/></svg>
       <div class="equiv-val" id="eq-bottles">–</div>
       <div class="equiv-lbl">water bottles (0.5 L)</div>
     </div>
     <div class="equiv-tile">
+      <svg class="equiv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0"/><line x1="4" y1="9" x2="20" y2="9"/><line x1="8" y1="13" x2="8" y2="15"/><line x1="12" y1="13" x2="12" y2="16"/><line x1="16" y1="13" x2="16" y2="15"/><line x1="8" y1="18" x2="8" y2="19"/><line x1="12" y1="19" x2="12" y2="20"/><line x1="16" y1="18" x2="16" y2="19"/></svg>
       <div class="equiv-val" id="eq-showers">–</div>
       <div class="equiv-lbl">showers (65 L)</div>
     </div>
