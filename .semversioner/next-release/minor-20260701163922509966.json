@@ -1,0 +1,4 @@
+{
+  "type": "minor",
+  "description": "Add macOS menu-bar app (Swift/AppKit) with background dashboard, /api/data.json endpoint, and Homebrew cask"
+}

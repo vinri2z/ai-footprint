@@ -704,6 +704,12 @@ function numFmt(n, dec=0) {
   if (n == null) return '–';
   return n.toLocaleString('en', { maximumFractionDigits: dec });
 }
+// HTML-escape untrusted strings (project paths, model/agent/provider names come
+// from local dirs + tokscale transcripts) before they go into innerHTML/attributes.
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
 
 // ── Period selector ────────────────────────────────────────────────────────
 let period = 'all';
@@ -864,7 +870,7 @@ function buildHourlyChart() {
       const v = byHour[h][m] || 0;
       if (!v) return '';
       const segPct = (v / totals[i] * 100).toFixed(2);
-      return '<div class="vchart-seg" style="height:' + segPct + '%;background:' + colorFor(m) + '" title="' + m + ': ' + fmtVal(v) + '"></div>';
+      return '<div class="vchart-seg" style="height:' + segPct + '%;background:' + colorFor(m) + '" title="' + esc(m) + ': ' + fmtVal(v) + '"></div>';
     }).join('');
     return '<div class="vchart-bar-col">'
       + '<div class="vchart-bar-val">' + fmtVal(totals[i]) + '</div>'
@@ -878,7 +884,7 @@ function buildHourlyChart() {
     + '<div class="vchart-labels">' + labels + '</div>';
 
   document.getElementById('chart-legend').innerHTML = models.map(m =>
-    '<div class="vchart-legend-item"><span class="vchart-legend-dot" style="background:' + colorFor(m) + '"></span>' + m + '</div>'
+    '<div class="vchart-legend-item"><span class="vchart-legend-dot" style="background:' + colorFor(m) + '"></span>' + esc(m) + '</div>'
   ).join('');
 }
 
@@ -923,7 +929,7 @@ function makeTable(tblId, bodyId, rows, cols) {
             + '</div></td>';
         }
         const cls = (col.r ? 'r' : '') + (col.dim ? ' dim' : '');
-        const html = col.render ? col.render(v, row) : (v == null ? '–' : String(v));
+        const html = col.render ? col.render(v, row) : (v == null ? '–' : esc(v));
         return '<td' + (cls ? ' class="' + cls.trim() + '"' : '') + '>' + html + '</td>';
       }).join('');
       body.appendChild(tr);
@@ -961,7 +967,7 @@ function monthLabel(m) {
 }
 
 makeTable('tbl-projects', 'body-projects', D.by_project || [], [
-  { key:'project',     render:(v) => '<span class="name-cell">' + (v||'–') + '</span>' },
+  { key:'project',     render:(v) => '<span class="name-cell">' + (v ? esc(v) : '–') + '</span>' },
   { key:'co2' },
   { key:'water',       r:true, render:(v) => waterStr(v) },
   { key:'cost',        r:true, render:(v) => costStr(v) },
@@ -972,7 +978,7 @@ makeTable('tbl-projects', 'body-projects', D.by_project || [], [
 ]);
 
 makeTable('tbl-agents', 'body-agents', D.by_agent || [], [
-  { key:'client',        render:(v) => '<span class="name-cell">' + (v||'–') + '</span>' },
+  { key:'client',        render:(v) => '<span class="name-cell">' + (v ? esc(v) : '–') + '</span>' },
   { key:'co2' },
   { key:'water',         r:true, render:(v) => waterStr(v) },
   { key:'cost',          r:true, render:(v) => costStr(v) },
@@ -983,7 +989,7 @@ makeTable('tbl-agents', 'body-agents', D.by_agent || [], [
 ]);
 
 makeTable('tbl-providers', 'body-providers', D.by_provider || [], [
-  { key:'provider',    render:(v) => '<span class="name-cell">' + (v||'–') + '</span>' },
+  { key:'provider',    render:(v) => '<span class="name-cell">' + (v ? esc(v) : '–') + '</span>' },
   { key:'co2' },
   { key:'water',       r:true, render:(v) => waterStr(v) },
   { key:'cost',        r:true, render:(v) => costStr(v) },
@@ -994,8 +1000,8 @@ makeTable('tbl-providers', 'body-providers', D.by_provider || [], [
 
 makeTable('tbl-models', 'body-models', D.by_model || [], [
   { key:'model',
-    render:(v,row) => '<span class="name-cell">' + (v||'–') + '</span>'
-      + (row.family ? '<span class="family-tag">' + row.family + '</span>' : '') },
+    render:(v,row) => '<span class="name-cell">' + (v ? esc(v) : '–') + '</span>'
+      + (row.family ? '<span class="family-tag">' + esc(row.family) + '</span>' : '') },
   { key:'provider', dim:true },
   { key:'co2' },
   { key:'water',       r:true, render:(v) => waterStr(v) },
@@ -1048,7 +1054,16 @@ def query_tokscale(data_script: str) -> dict:
 
 def render_page(data: dict) -> bytes:
     """Bake the aggregated data into the static HTML page."""
-    return HTML.replace("__DATA__", json.dumps(data, ensure_ascii=False)).encode("utf-8")
+    # Escape "<" so a value containing "</script>" (e.g. a project path or model
+    # name from a local dir) can't break out of the injected <script> block. JSON
+    # parses < identically, so this is transparent to the page.
+    payload = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
+    return HTML.replace("__DATA__", payload).encode("utf-8")
+
+
+def render_json(data: dict) -> bytes:
+    """Serialize the aggregated data for the /api/data.json endpoint."""
+    return json.dumps(data, ensure_ascii=False).encode("utf-8")
 
 
 def background_refresher(data_script: str, interval: int):
@@ -1063,6 +1078,7 @@ def background_refresher(data_script: str, interval: int):
         try:
             data = query_tokscale(data_script)
             Handler.page_bytes = render_page(data)
+            Handler.data_json = render_json(data)
         except Exception as e:  # never let a bad refresh kill the server
             sys.stderr.write(f"background refresh failed: {e}\n")
 
@@ -1073,6 +1089,7 @@ def background_refresher(data_script: str, interval: int):
 
 class Handler(BaseHTTPRequestHandler):
     page_bytes: bytes = b""
+    data_json: bytes = b"{}"
 
     def do_GET(self):
         if self.path in ("/", "/index.html"):
@@ -1081,6 +1098,13 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(self.page_bytes)))
             self.end_headers()
             self.wfile.write(self.page_bytes)
+        elif self.path in ("/api/data.json", "/api/data"):
+            # Raw aggregated footprint JSON — consumed by the menu-bar app.
+            self.send_response(200)
+            self.send_header("Content-Type",   "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(self.data_json)))
+            self.end_headers()
+            self.wfile.write(self.data_json)
         else:
             self.send_response(404)
             self.end_headers()
@@ -1115,6 +1139,7 @@ def main():
         sys.exit(1)
 
     Handler.page_bytes = render_page(data)
+    Handler.data_json = render_json(data)
 
     if args.refresh_secs > 0:
         threading.Thread(
@@ -1124,7 +1149,10 @@ def main():
         ).start()
 
     url = f"http://localhost:{args.port}"
-    server = HTTPServer(("", args.port), Handler)
+    # Bind loopback only — the dashboard and /api/data.json expose project paths,
+    # agent/model list, costs and activity timeline with no auth, so they must not
+    # be reachable from the LAN.
+    server = HTTPServer(("127.0.0.1", args.port), Handler)
     print(f"Footprint dashboard → {url}", flush=True)
     print("Press Ctrl+C to stop.", flush=True)
 

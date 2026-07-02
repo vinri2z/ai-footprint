@@ -20,6 +20,9 @@ jobs:
     # Skip the commit the release job itself pushes back, to avoid a loop.
     # (Belt-and-suspenders: GITHUB_TOKEN pushes also don't retrigger workflows.)
     if: ${{ !startsWith(github.event.head_commit.message, 'release:') }}
+    outputs:
+      released: ${{ steps.decide.outputs.release }}
+      version: ${{ steps.ver.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -63,6 +66,11 @@ jobs:
           git push origin HEAD:main
           git push origin --tags
 
+      - name: Emit released version
+        id: ver
+        if: steps.decide.outputs.release == 'true'
+        run: echo "version=$(jq -r .version .claude-plugin/plugin.json)" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         if: steps.decide.outputs.release == 'true'
         env:
@@ -72,3 +80,46 @@ jobs:
           # Release notes = this version's section, minus the generated file header.
           notes="$(semversioner changelog --template .semversioner/config/template.j2 --version "$ver" | tail -n +4)"
           gh release create "v$ver" --title "v$ver" --notes "$notes"
+
+  # macOS build must run after the release commit + tag land on main, on a mac
+  # runner (swiftc/codesign/ditto). Uploads the .app zip to the tag and pins the
+  # cask sha. Its commit is `release:`-prefixed so the release job above skips it.
+  desktop:
+    name: build + attach macOS app
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main          # the release commit (bumped version + tag) just pushed
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build signed .app + zip
+        run: bash desktop/build-app.sh --zip
+
+      - name: Upload app to release and pin cask sha
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          zip="desktop/build/AI-Footprint-${VERSION}.zip"
+          gh release upload "v${VERSION}" "$zip" --clobber
+          export SHA="$(shasum -a 256 "$zip" | awk '{print $1}')"
+
+          # Pin the cask to this release: version + real sha256. Single-quoted perl
+          # so $ENV{...} reaches perl (VERSION/SHA come from the environment, not the shell).
+          perl -0pi -e 's/^  version ".*"/  version "$ENV{VERSION}"/m' Casks/ai-footprint.rb
+          perl -0pi -e 's/^  sha256 .*/  sha256 "$ENV{SHA}"/m'         Casks/ai-footprint.rb
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet Casks/ai-footprint.rb; then
+            git add Casks/ai-footprint.rb
+            git commit -m "release: pin ai-footprint cask to v${VERSION}"
+            git push origin HEAD:main
+          else
+            echo "cask already pinned to v${VERSION}"
+          fi
