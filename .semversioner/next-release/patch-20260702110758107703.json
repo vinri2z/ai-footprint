@@ -1,0 +1,4 @@
+{
+  "type": "patch",
+  "description": "Bind dashboard server to loopback only and escape untrusted strings in the dashboard to prevent LAN data exposure and XSS"
+}
