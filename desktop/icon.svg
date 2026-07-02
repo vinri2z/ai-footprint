@@ -1,0 +1,32 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- AI Footprint app icon: cream squircle background + green leaf. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FDFBF4"/>
+      <stop offset="1" stop-color="#F4EEDF"/>
+    </linearGradient>
+    <linearGradient id="leaf" x1="0.2" y1="0.1" x2="0.85" y2="0.95">
+      <stop offset="0" stop-color="#5FBF6A"/>
+      <stop offset="1" stop-color="#2E8B45"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded-square background (macOS margin ~100px) -->
+  <rect x="100" y="100" width="824" height="824" rx="185" ry="185" fill="url(#bg)"/>
+
+  <!-- Leaf body -->
+  <g transform="translate(512 512)">
+    <path d="M -30 235
+             C -215 150 -235 -95 -55 -235
+             C 130 -95 215 150 30 235
+             C 12 245 -12 245 -30 235 Z"
+          fill="url(#leaf)"/>
+    <!-- Midrib vein -->
+    <path d="M 0 232 C -6 60 -6 -80 -20 -222"
+          fill="none" stroke="#FDFBF4" stroke-width="16" stroke-linecap="round" opacity="0.85"/>
+    <!-- Side veins -->
+    <path d="M -4 120 C -60 95 -95 60 -110 15" fill="none" stroke="#FDFBF4" stroke-width="11" stroke-linecap="round" opacity="0.65"/>
+    <path d="M -8 20 C -58 0 -88 -35 -100 -80" fill="none" stroke="#FDFBF4" stroke-width="11" stroke-linecap="round" opacity="0.65"/>
+    <path d="M -12 -80 C -50 -95 -72 -125 -80 -160" fill="none" stroke="#FDFBF4" stroke-width="10" stroke-linecap="round" opacity="0.6"/>
+  </g>
+</svg>

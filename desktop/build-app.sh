@@ -11,6 +11,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="${REPO_ROOT}/desktop/AiFootprintMenuBar/main.swift"
+ICON_PNG="${REPO_ROOT}/desktop/AppIcon.png"
 BUILD="${REPO_ROOT}/desktop/build"
 APP="${BUILD}/AI Footprint.app"
 EXE_NAME="AiFootprintMenuBar"
@@ -30,6 +31,26 @@ swiftc -O \
   -o "${APP}/Contents/MacOS/${EXE_NAME}" \
   "$SRC"
 
+# 1b. App icon — derive AppIcon.icns from desktop/AppIcon.png (1024²) using the
+#     built-in sips + iconutil (no extra deps). Master PNG is regenerated from
+#     desktop/icon.svg; see that file to change the artwork.
+if [[ -f "$ICON_PNG" ]]; then
+  ICONSET="${BUILD}/AppIcon.iconset"
+  rm -rf "$ICONSET"
+  mkdir -p "$ICONSET"
+  for size in 16 32 128 256 512; do
+    x2=$((size * 2))
+    sips -z "$size" "$size" "$ICON_PNG" --out "${ICONSET}/icon_${size}x${size}.png"    >/dev/null
+    sips -z "$x2"  "$x2"   "$ICON_PNG" --out "${ICONSET}/icon_${size}x${size}@2x.png" >/dev/null
+  done
+  iconutil -c icns "$ICONSET" -o "${APP}/Contents/Resources/AppIcon.icns"
+  rm -rf "$ICONSET"
+  ICON_PLIST_KEY='<key>CFBundleIconFile</key><string>AppIcon</string>'
+else
+  echo "warning: ${ICON_PNG} missing — building without an app icon"
+  ICON_PLIST_KEY=''
+fi
+
 # 2. Info.plist (LSUIElement = menu-bar only, no Dock icon)
 cat > "${APP}/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -43,6 +64,7 @@ cat > "${APP}/Contents/Info.plist" <<PLIST
   <key>CFBundleVersion</key><string>${VERSION}</string>
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>CFBundlePackageType</key><string>APPL</string>
+  ${ICON_PLIST_KEY}
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHumanReadableCopyright</key><string>MIT — github.com/vinri2z/ai-footprint</string>
