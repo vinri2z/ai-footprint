@@ -157,10 +157,14 @@ Prefer a native app to the Claude Code plugin? A macOS menu-bar app keeps the da
 running in the background and shows today's CO2 in the menu bar.
 
 ```bash
-brew install --cask vinri2z/ai-footprint/ai-footprint   # once a release is published
-# or build locally:
+brew tap vinri2z/ai-footprint
+brew install --cask vinri2z/ai-footprint/ai-footprint
+# or build locally (no tap needed):
 bash desktop/build-app.sh && open "desktop/build/AI Footprint.app"
 ```
+
+The app is ad-hoc signed (not notarized); if Gatekeeper blocks it, right-click → **Open**
+or run `xattr -dr com.apple.quarantine "/Applications/AI Footprint.app"`.
 
 See [`desktop/README.md`](desktop/README.md) for details. It bundles the same
 bash/python engine; `node`/`jq` come from the cask's dependencies.

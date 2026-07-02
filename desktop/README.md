@@ -43,11 +43,25 @@ open "desktop/build/AI Footprint.app"
 ## Install via Homebrew
 
 ```bash
+brew tap vinri2z/ai-footprint            # taps github.com/vinri2z/homebrew-ai-footprint
 brew install --cask vinri2z/ai-footprint/ai-footprint
-# or, from a local checkout:
-brew install --cask ./Casks/ai-footprint.rb
 ```
 
-The cask (`Casks/ai-footprint.rb`) points at a GitHub release zip. To cut a release:
-`bash desktop/build-app.sh --zip`, upload the zip to the `v<version>` release, then
-pin the cask's `sha256` to `shasum -a 256` of that zip.
+The app is ad-hoc signed, not notarized, so Gatekeeper quarantines it on download.
+If macOS blocks it with "developer cannot be verified", right-click the app → **Open**
+(once), or clear the quarantine flag:
+`xattr -dr com.apple.quarantine "/Applications/AI Footprint.app"`.
+
+> Homebrew cannot install a cask from a local `.rb` path — casks must come from a tap.
+> For local testing without the tap, just build and run the app directly:
+> `bash desktop/build-app.sh && open "desktop/build/AI Footprint.app"`.
+
+### Cutting a release
+
+The canonical cask lives in the tap repo (`vinri2z/homebrew-ai-footprint`);
+`Casks/ai-footprint.rb` here is the maintained source that gets copied there.
+
+1. `bash desktop/build-app.sh --zip` → `desktop/build/AI-Footprint-<version>.zip`
+2. Upload that zip to the `v<version>` GitHub release.
+3. Pin the cask's `sha256` to `shasum -a 256` of that exact zip.
+4. Copy `Casks/ai-footprint.rb` into the tap repo and push.

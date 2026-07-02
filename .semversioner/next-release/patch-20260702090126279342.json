@@ -1,0 +1,4 @@
+{
+  "type": "patch",
+  "description": "Fix Homebrew install: publish release zip, pin cask sha256, document tap-based install (local .rb path installs are not supported by Homebrew)"
+}
