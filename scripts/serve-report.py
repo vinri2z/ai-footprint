@@ -1051,6 +1051,11 @@ def render_page(data: dict) -> bytes:
     return HTML.replace("__DATA__", json.dumps(data, ensure_ascii=False)).encode("utf-8")
 
 
+def render_json(data: dict) -> bytes:
+    """Serialize the aggregated data for the /api/data.json endpoint."""
+    return json.dumps(data, ensure_ascii=False).encode("utf-8")
+
+
 def background_refresher(data_script: str, interval: int):
     """Periodically re-run footprint-data.sh and swap in the fresh page.
 
@@ -1063,6 +1068,7 @@ def background_refresher(data_script: str, interval: int):
         try:
             data = query_tokscale(data_script)
             Handler.page_bytes = render_page(data)
+            Handler.data_json = render_json(data)
         except Exception as e:  # never let a bad refresh kill the server
             sys.stderr.write(f"background refresh failed: {e}\n")
 
@@ -1073,6 +1079,7 @@ def background_refresher(data_script: str, interval: int):
 
 class Handler(BaseHTTPRequestHandler):
     page_bytes: bytes = b""
+    data_json: bytes = b"{}"
 
     def do_GET(self):
         if self.path in ("/", "/index.html"):
@@ -1081,6 +1088,13 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(self.page_bytes)))
             self.end_headers()
             self.wfile.write(self.page_bytes)
+        elif self.path in ("/api/data.json", "/api/data"):
+            # Raw aggregated footprint JSON — consumed by the menu-bar app.
+            self.send_response(200)
+            self.send_header("Content-Type",   "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(self.data_json)))
+            self.end_headers()
+            self.wfile.write(self.data_json)
         else:
             self.send_response(404)
             self.end_headers()
@@ -1115,6 +1129,7 @@ def main():
         sys.exit(1)
 
     Handler.page_bytes = render_page(data)
+    Handler.data_json = render_json(data)
 
     if args.refresh_secs > 0:
         threading.Thread(

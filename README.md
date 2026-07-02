@@ -151,6 +151,20 @@ The trade-off is retention: tokscale only sees what each agent keeps on disk, an
 | `/footprint-report` | Interactive web dashboard with CO2 + water totals, equivalences, by-agent/provider/model breakdowns and a daily timeline |
 | `/footprint-card`   | Generate shareable PNG report cards (CO2 + water)   |
 
+## Menu-bar app (macOS)
+
+Prefer a native app to the Claude Code plugin? A macOS menu-bar app keeps the dashboard
+running in the background and shows today's CO2 in the menu bar.
+
+```bash
+brew install --cask vinri2z/ai-footprint/ai-footprint   # once a release is published
+# or build locally:
+bash desktop/build-app.sh && open "desktop/build/AI Footprint.app"
+```
+
+See [`desktop/README.md`](desktop/README.md) for details. It bundles the same
+bash/python engine; `node`/`jq` come from the cask's dependencies.
+
 <details>
 <summary>Scripts (run automatically, rarely needed manually)</summary>
 
