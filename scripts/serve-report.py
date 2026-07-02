@@ -218,16 +218,18 @@ HTML = """\
     }
     .vchart-bar-val {
       font-family: "Clash Display", sans-serif;
-      font-size: 10px;
+      font-size: 9px;
+      line-height: 1.3;
       color: var(--muted);
       margin-bottom: 3px;
-      white-space: nowrap;
+      white-space: normal;
       overflow: hidden;
       max-width: 100%;
       text-align: center;
       opacity: 0;
       transition: opacity 0.12s;
     }
+    .vchart-bar-val div { white-space: nowrap; }
     .vchart-bar-col:hover .vchart-bar-val { opacity: 1; }
     .vchart-bar {
       width: 100%;
@@ -477,8 +479,7 @@ HTML = """\
       <div class="section-title" id="chart-title">monthly breakdown</div>
       <div style="display:flex;gap:8px;align-items:center">
         <div class="range-sel" id="series-sel">
-          <button class="range-btn active" data-s="co2">CO₂</button>
-          <button class="range-btn" data-s="water">Water</button>
+          <button class="range-btn active" data-s="co2">CO₂ / Water / kWh</button>
           <button class="range-btn" data-s="cost">Cost</button>
           <button class="range-btn" data-s="tokens">Tokens</button>
         </div>
@@ -688,6 +689,11 @@ function waterStr(l) {
   if (l >= 1)    return l.toFixed(2) + ' L';
   return (l*1e3).toFixed(0) + ' mL';
 }
+function kwhStr(kwh) {
+  if (kwh == null) return '–';
+  if (kwh >= 1e3) return (kwh/1e3).toFixed(2) + ' MWh';
+  return kwh.toFixed(2) + ' kWh';
+}
 function costStr(u) {
   if (u == null) return '–';
   if (u >= 1e3)  return '$' + (u/1e3).toFixed(1) + 'k';
@@ -751,7 +757,7 @@ function refreshEquiv() {
 
 // ── Monthly chart ──────────────────────────────────────────────────────────
 let chartRange  = '6';   // '6' | '12' | 'all'
-let chartSeries = 'co2'; // 'co2' | 'water' | 'cost' | 'tokens'
+let chartSeries = 'co2'; // 'co2' (co2+water+kwh combined) | 'cost' | 'tokens'
 
 document.querySelectorAll('#series-sel .range-btn').forEach(b => {
   b.addEventListener('click', () => {
@@ -813,11 +819,23 @@ function buildMonthlyChart() {
   const vals   = months.map(getVal);
   const maxVal = Math.max(...vals, 1);
 
+  // CO2, water and kWh are fixed multiples of each other (see data/factors.json),
+  // so bar height stays CO2-driven; hover just surfaces all three at once.
+  const valLabel = m => (chartSeries === 'co2')
+    ? '<div>' + co2Str(m.co2 || 0) + '</div>'
+      + '<div>' + waterStr(m.water || 0) + '</div>'
+      + '<div>' + kwhStr((m.co2 || 0) / 287) + '</div>'
+    : fmtVal(m[chartSeries] || 0);
+
+  // Leave headroom above the tallest bar for the 3-line CO2/Water/kWh label,
+  // otherwise it gets clipped by the chart container on the max-value bar.
+  const scaleMax = (chartSeries === 'co2') ? maxVal * 1.35 : maxVal;
+
   const bars = months.map((m, i) => {
     const v   = vals[i];
-    const pct = (v / maxVal * 100).toFixed(1);
+    const pct = (v / scaleMax * 100).toFixed(1);
     return '<div class="vchart-bar-col">'
-      + '<div class="vchart-bar-val">' + fmtVal(v) + '</div>'
+      + '<div class="vchart-bar-val">' + valLabel(m) + '</div>'
       + '<div class="vchart-bar" style="height:' + pct + '%"></div>'
       + '</div>';
   }).join('');
